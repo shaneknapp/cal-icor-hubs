@@ -23,6 +23,18 @@ jupyterhub:
         hub.jupyter.org/pool-name: core-pool-2025-12-22
 
   hub:
+    loadRoles:
+      user-login:
+        description: "RTC perms"
+        scopes:
+          - access:servers
+          - read:users:name
+          - read:users:groups
+          - shares!user
+          - list:users
+          - list:groups
+          - servers!user
+          - users:activity
     nodeSelector:
       hub.jupyter.org/pool-name: core-pool-2025-12-22
     config:
