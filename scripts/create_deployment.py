@@ -92,9 +92,7 @@ def create_label(hub_name: str, root_path: str) -> str:
     labeler_path = Path(root_path) / ".github" / "labeler.yml"
     hub_label = f"""
 'hub: {hub_name}':
-  - changed-files:
-    - any-glob-to-any-file:
-      - 'deployments/{hub_name}/**'
+  - 'deployments/{hub_name}/**'
 """.strip()
     labeler_path.write_text(hub_label, append=True)
     print(f"Added {hub_name} to the labeler.yml file.")
