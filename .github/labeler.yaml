@@ -57,23 +57,15 @@ images:
 documentation:
   - changed-files:
     - any-glob-to-any-file:
-      - '**/*.txt'
-      - '!**/apt.txt'
-      - '!**/dev-requirements.txt'
-      - '!**/requirements.txt'
-      - '!**/runtime.txt'
-  - changed-files:
-    - any-glob-to-any-file:
       - 'docs/**'
       - '**/*.md'
       - 'LICENSE'
 
-# add build-infra label to any .github changes
+# add build-infra label to any .github or gitignore changes
 build-infra:
   - changed-files:
     - any-glob-to-any-file:
       - '.github/**'
-      - '!.github/ISSUE_TEMPLATE/**'
       - '.gitignore'
 
 issue-templates:
