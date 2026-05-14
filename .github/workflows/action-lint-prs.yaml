@@ -1,10 +1,6 @@
 name: "Lint workflow files on pull requests"
 on:
-  pull_request:
-    types:
-      - opened
-    paths:
-      - ".github/workflows/**.yaml"
+  - pull_request  # yamllint disable-line rule:truthy
 
 jobs:
   lint:
