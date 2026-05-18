@@ -4,6 +4,8 @@ on:
     types: [opened, synchronize]
     paths:
       - ".github/workflows/*.yaml"
+permissions:
+  contents: read
 
 jobs:
   lint:
