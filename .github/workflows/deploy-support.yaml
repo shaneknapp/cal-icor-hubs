@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Get PR labels
         id: pr-labels
-        uses: irby/get-labels-on-push@v1.1.0
+        uses: irby/get-labels-on-push@v1.2.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -53,14 +53,6 @@ jobs:
           curl -sSL https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64 -o "${HOME}/bin/sops"
           chmod 755 "${HOME}/bin/sops"
           echo "${HOME}/bin" >> "$GITHUB_PATH"
-
-      - name: Store SOPS secret in a file
-        if: ${{ env.DEPLOY }}
-        run: |
-          cat << EOF > "${HOME}/sops.key"
-          ${{ secrets.SOPS_KEY }}
-          EOF
-          echo "GOOGLE_APPLICATION_CREDENTIALS=${HOME}/sops.key" >> "$GITHUB_ENV"
 
       - name: Activate credentials for cluster
         if: ${{ env.DEPLOY }}
