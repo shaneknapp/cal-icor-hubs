@@ -52,7 +52,7 @@ jupyterhub-home-nfs:
   nfsServer:
     resources:
       requests:
-        cpu: 0.02
+        cpu: 0.03
         memory: 512M
       limits:
         cpu: 0.1
