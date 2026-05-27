@@ -15,7 +15,7 @@ Optional arguments:
     --threshold      User count threshold for "above N users" stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.
     --timezone       IANA timezone for local time display, should match hub users' location
                      (default: America/Los_Angeles)
-    --report-format  Write a report to scripts/reports/: text, markdown, or html (default: text)
+    --save-report    Optionally save a report to scripts/reports/: text, markdown (or md), or html
 """
 
 import argparse
@@ -347,10 +347,15 @@ def format_html(report):
 def write_report(report, fmt, script_dir):
     """Write a formatted report to scripts/reports/."""
     date_str = datetime.now().strftime("%Y-%m-%d")
-    ext = {"text": "txt", "markdown": "md", "html": "html"}[fmt]
+    ext = {"text": "txt", "markdown": "md", "md": "md", "html": "html"}[fmt]
     path = script_dir / "reports" / f"concurrent-users-{date_str}.{ext}"
 
-    formatters = {"text": format_text, "markdown": format_markdown, "html": format_html}
+    formatters = {
+        "text": format_text,
+        "markdown": format_markdown,
+        "md": format_markdown,
+        "html": format_html,
+    }
     path.write_text(formatters[fmt](report), encoding="utf-8")
     print(f"\nReport written to {path}")
 
@@ -517,7 +522,8 @@ def main(args):
     # -------------------------------------------------------------------------
     # Optional: write report to scripts/reports/
     # -------------------------------------------------------------------------
-    write_report(report, args.report_format, Path(__file__).parent)
+    if args.save_report:
+        write_report(report, args.save_report, Path(__file__).parent)
 
 
 if __name__ == "__main__":
@@ -549,9 +555,8 @@ if __name__ == "__main__":
         help="IANA timezone for local time display, should match hub users' location (default: America/Los_Angeles)",
     )
     parser.add_argument(
-        "--report-format",
-        choices=["text", "markdown", "html"],
-        default="text",
-        help="Write a report to scripts/reports/ in the specified format (default: text)",
+        "--save-report",
+        choices=["text", "markdown", "md", "html"],
+        help="Save a report to scripts/reports/ in the specified format (md and markdown are equivalent)",
     )
     main(parser.parse_args())
