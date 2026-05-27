@@ -355,42 +355,7 @@ def write_report(report, fmt, script_dir):
     print(f"\nReport written to {path}")
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    parser.add_argument(
-        "--days", type=int, default=148, help="Days to look back (default: 148)"
-    )
-    parser.add_argument(
-        "--step",
-        default="5m",
-        help="Query resolution step for instant queries (default: 5m)",
-    )
-    parser.add_argument(
-        "--url",
-        default="http://localhost:9090",
-        help="Prometheus URL (default: http://localhost:9090)",
-    )
-    parser.add_argument(
-        "--threshold",
-        type=int,
-        default=80,
-        help="User count threshold for percentage/hours stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.",
-    )
-    parser.add_argument(
-        "--timezone",
-        default="America/Los_Angeles",
-        help="IANA timezone for local time display, should match hub users' location (default: America/Los_Angeles)",
-    )
-    parser.add_argument(
-        "--report-format",
-        choices=["text", "markdown", "html"],
-        default="text",
-        help="Write a report to scripts/reports/ in the specified format (default: text)",
-    )
-    args = parser.parse_args()
-
+def main(args):
     window = f"{args.days}d"
     subquery = f"[{window}:{args.step}]"
     ns_filter = 'namespace=~".*-prod"'
@@ -556,4 +521,37 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--days", type=int, default=148, help="Days to look back (default: 148)"
+    )
+    parser.add_argument(
+        "--step",
+        default="5m",
+        help="Query resolution step for instant queries (default: 5m)",
+    )
+    parser.add_argument(
+        "--url",
+        default="http://localhost:9090",
+        help="Prometheus URL (default: http://localhost:9090)",
+    )
+    parser.add_argument(
+        "--threshold",
+        type=int,
+        default=80,
+        help="User count threshold for percentage/hours stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.",
+    )
+    parser.add_argument(
+        "--timezone",
+        default="America/Los_Angeles",
+        help="IANA timezone for local time display, should match hub users' location (default: America/Los_Angeles)",
+    )
+    parser.add_argument(
+        "--report-format",
+        choices=["text", "markdown", "html"],
+        default="text",
+        help="Write a report to scripts/reports/ in the specified format (default: text)",
+    )
+    main(parser.parse_args())
