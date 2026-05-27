@@ -531,7 +531,7 @@ if __name__ == "__main__":
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--days", type=int, default=148, help="Days to look back (default: 148)"
+        "-d", "--days", type=int, default=148, help="Days to look back (default: 148)"
     )
     parser.add_argument(
         "--step",
@@ -539,22 +539,26 @@ if __name__ == "__main__":
         help="Query resolution step for instant queries (default: 5m)",
     )
     parser.add_argument(
+        "-u",
         "--url",
         default="http://localhost:9090",
         help="Prometheus URL (default: http://localhost:9090)",
     )
     parser.add_argument(
+        "-t",
         "--threshold",
         type=int,
         default=80,
         help="User count threshold for percentage/hours stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.",
     )
     parser.add_argument(
+        "-z",
         "--timezone",
         default="America/Los_Angeles",
         help="IANA timezone for local time display, should match hub users' location (default: America/Los_Angeles)",
     )
     parser.add_argument(
+        "-r",
         "--save-report",
         choices=["text", "markdown", "md", "html"],
         help="Save a report to scripts/reports/ in the specified format (md and markdown are equivalent)",
