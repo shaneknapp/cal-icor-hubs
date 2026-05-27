@@ -75,4 +75,4 @@ jupyterhub:
         subPath: "{username}"
     memory:
       guarantee: 1G
-      limit: 2G
+      limit: 1G
