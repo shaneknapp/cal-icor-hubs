@@ -12,7 +12,7 @@ Optional arguments:
     --days      Number of days to look back (default: 148)
     --step      Query resolution step for instant queries (default: 5m)
     --url       Prometheus URL (default: http://localhost:9090)
-    --threshold User count threshold for "above N users" stats (default: 80)
+    --threshold User count threshold for "above N users" stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.
     --tz-offset Hours offset from UTC for local time display (default: -7 for PDT)
 """
 
@@ -119,7 +119,7 @@ def main():
         "--threshold",
         type=int,
         default=80,
-        help="User count threshold for percentage/hours stats (default: 80)",
+        help="User count threshold for percentage/hours stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.",
     )
     parser.add_argument(
         "--tz-offset",
