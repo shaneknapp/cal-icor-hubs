@@ -13,7 +13,8 @@ Optional arguments:
     --step           Query resolution step for instant queries (default: 5m)
     --url            Prometheus URL (default: http://localhost:9090)
     --threshold      User count threshold for "above N users" stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.
-    --tz-offset      Hours offset from UTC for local time display (default: auto-detected from system timezone)
+    --timezone       IANA timezone for local time display, should match hub users' location
+                     (default: America/Los_Angeles)
     --report-format  Write a report to scripts/reports/: text, markdown, or html (default: text)
 """
 
@@ -27,6 +28,7 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
+from zoneinfo import ZoneInfo
 
 DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
@@ -67,14 +69,14 @@ def query_range(url, promql, start, end, step):
     return data["data"]["result"][0]["values"]
 
 
-def get_range_samples(url, days, tz_offset_hours):
+def get_range_samples(url, days, tz_name):
     """
     Fetch total running servers at 30m resolution over the given number of days.
-    Returns a list of (datetime_local, value) tuples.
+    Returns a list of (datetime_local, value) tuples, converted to tz_name.
     """
     end = int(time.time())
     start = end - days * 86400
-    tz_offset_secs = tz_offset_hours * 3600
+    tz = ZoneInfo(tz_name)
 
     # 148 days at 30m = ~7104 samples, well within the 11000-point limit
     values = query_range(
@@ -88,8 +90,7 @@ def get_range_samples(url, days, tz_offset_hours):
     samples = []
     for ts, val in values:
         v = max(int(float(val)), 0)  # clamp negatives from counter resets
-        local_ts = int(ts) + tz_offset_secs
-        dt = datetime.fromtimestamp(local_ts, tz=timezone.utc)
+        dt = datetime.fromtimestamp(int(ts), tz=tz)
         samples.append((dt, v))
     return samples
 
@@ -111,7 +112,7 @@ def format_text(report):
     lines.append(f"Generated: {report['generated']}")
     lines.append(
         f"Range: last {days} days  |  Threshold: {T} users"
-        f"  |  UTC offset: {report['tz_offset']:+d}h"
+        f"  |  Timezone: {report['timezone']}"
     )
 
     lines.append(f"\n{'=' * 60}")
@@ -191,7 +192,7 @@ def format_markdown(report):
     lines.append(
         f"**Range:** last {days} days  |  "
         f"**Threshold:** {T} users  |  "
-        f"**UTC offset:** {report['tz_offset']:+d}h"
+        f"**Timezone:** {report['timezone']}"
     )
     lines.append("")
 
@@ -286,7 +287,7 @@ def format_html(report):
   Generated: {report["generated"]} &nbsp;|&nbsp;
   Range: last {days} days &nbsp;|&nbsp;
   Threshold: {T} users &nbsp;|&nbsp;
-  UTC offset: {report["tz_offset"]:+d}h
+  Timezone: {report["timezone"]}
 </p>"""
     )
 
@@ -355,8 +356,6 @@ def write_report(report, fmt, script_dir):
 
 
 def main():
-    tz_default = int(datetime.now().astimezone().utcoffset().total_seconds() // 3600)
-
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -380,10 +379,9 @@ def main():
         help="User count threshold for percentage/hours stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.",
     )
     parser.add_argument(
-        "--tz-offset",
-        type=int,
-        default=tz_default,
-        help=f"Hours offset from UTC for local time display (default: auto-detected as {tz_default:+d}h)",
+        "--timezone",
+        default="America/Los_Angeles",
+        help="IANA timezone for local time display, should match hub users' location (default: America/Los_Angeles)",
     )
     parser.add_argument(
         "--report-format",
@@ -400,14 +398,14 @@ def main():
     T2 = T + 40
 
     print(f"Querying {args.url} over the last {args.days} days")
-    print(f"Threshold: {T} users  |  UTC offset: {args.tz_offset:+d}h\n")
+    print(f"Threshold: {T} users  |  Timezone: {args.timezone}\n")
 
     report = {
         "generated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "days": args.days,
         "threshold": T,
         "threshold2": T2,
-        "tz_offset": args.tz_offset,
+        "timezone": args.timezone,
         "overall": {"peak": None, "above": []},
         "hubs": [],
         "weeks": [],
@@ -471,7 +469,7 @@ def main():
     # -------------------------------------------------------------------------
     # Fetch range data once for the remaining analyses (30m resolution)
     # -------------------------------------------------------------------------
-    samples = get_range_samples(args.url, args.days, args.tz_offset)
+    samples = get_range_samples(args.url, args.days, args.timezone)
 
     # -------------------------------------------------------------------------
     # Section 3: Week-by-week breakdown
