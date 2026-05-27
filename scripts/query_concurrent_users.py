@@ -13,7 +13,7 @@ Optional arguments:
     --step           Query resolution step for instant queries (default: 5m)
     --url            Prometheus URL (default: http://localhost:9090)
     --threshold      User count threshold for "above N users" stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.
-    --tz-offset      Hours offset from UTC for local time display (default: -7 for PDT)
+    --tz-offset      Hours offset from UTC for local time display (default: auto-detected from system timezone)
     --report-format  Write a report to scripts/reports/: text, markdown, or html (default: text)
 """
 
@@ -355,6 +355,8 @@ def write_report(report, fmt, script_dir):
 
 
 def main():
+    tz_default = int(datetime.now().astimezone().utcoffset().total_seconds() // 3600)
+
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -380,8 +382,8 @@ def main():
     parser.add_argument(
         "--tz-offset",
         type=int,
-        default=-7,
-        help="Hours offset from UTC for local time display (default: -7 for PDT)",
+        default=tz_default,
+        help=f"Hours offset from UTC for local time display (default: auto-detected as {tz_default:+d}h)",
     )
     parser.add_argument(
         "--report-format",
