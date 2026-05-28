@@ -130,6 +130,16 @@ def format_text(report):
         f"Range: last {days} days  |  Thresholds: {T}, {T2} users per node"
         f"  |  Namespace: {report['namespace_pattern']}  |  Timezone: {report['timezone']}"
     )
+    lines.append(
+        f"\nColumn legend:\n"
+        f"  Peak     highest concurrent users observed\n"
+        f"  Active   unique users with a running server (7-day rolling window)\n"
+        f"  Hrs>{T}  hours where concurrent users exceeded {T} (node capacity)\n"
+        f"  Hrs>{T2}  hours where concurrent users exceeded {T2} (1.5x node capacity)\n"
+        f"  Avg      average concurrent users in the time bucket\n"
+        f"  Pct>{T}  % of samples where concurrent users exceeded {T}\n"
+        f"  Chart    bar chart; each # = 5 users"
+    )
 
     lines.append(f"\n{'=' * 60}")
     lines.append(f"  Overall statistics (last {days} days)")
@@ -191,6 +201,7 @@ def format_text(report):
             f"  {dow['label']:<5} {dow['peak']:>5}  {dow['avg']:>5.1f}"
             f"  {dow['pct']:>7.1f}%  {bar}"
         )
+    lines.append("")
 
     return "\n".join(lines)
 
@@ -211,6 +222,24 @@ def format_markdown(report):
         f"**Namespace:** {report['namespace_pattern']}  |  "
         f"**Timezone:** {report['timezone']}"
     )
+    lines.append("")
+    lines.append("**Column legend:**")
+    lines.append("")
+    lines.append("| Column | Description |")
+    lines.append("|---|---|")
+    lines.append("| Peak | Highest concurrent users observed |")
+    lines.append(
+        "| Active | Unique users with a running server (7-day rolling window) |"
+    )
+    lines.append(
+        f"| Hrs>{T} | Hours where concurrent users exceeded {T} (node capacity) |"
+    )
+    lines.append(
+        f"| Hrs>{T2} | Hours where concurrent users exceeded {T2} (1.5x node capacity) |"
+    )
+    lines.append("| Avg | Average concurrent users in the time bucket |")
+    lines.append(f"| Pct>{T} | % of samples where concurrent users exceeded {T} |")
+    lines.append("| Chart | Bar chart; each # = 5 users |")
     lines.append("")
 
     lines.append(f"## Overall statistics (last {days} days)")
@@ -309,6 +338,19 @@ def format_html(report):
 </p>"""
     )
 
+    parts.append(
+        f"<h2>Column legend</h2><table>"
+        f"{th('Column', 'Description')}"
+        f"{td('Peak', 'Highest concurrent users observed')}"
+        f"{td('Active', 'Unique users with a running server (7-day rolling window)')}"
+        f"{td(f'Hrs&gt;{T}', f'Hours where concurrent users exceeded {T} (node capacity)')}"
+        f"{td(f'Hrs&gt;{T2}', f'Hours where concurrent users exceeded {T2} (1.5x node capacity)')}"
+        f"{td('Avg', 'Average concurrent users in the time bucket')}"
+        f"{td(f'Pct&gt;{T}', f'% of samples where concurrent users exceeded {T}')}"
+        f"{td('Chart', 'Bar chart; each # = 5 users')}"
+        f"</table>"
+    )
+
     parts.append(f"<h2>Overall statistics (last {days} days)</h2><table>")
     parts.append(th("Metric", "Value"))
     parts.append(
@@ -385,12 +427,22 @@ def main(args):
     subquery = f"[{window}:{args.step}]"
     ns_filter = f'namespace=~"{args.namespace_pattern}"'
     T = args.threshold
-    T2 = T + 40
+    T2 = int(T * 1.5)
 
     print(f"Querying {args.url} over the last {args.days} days")
     print(
         f"Thresholds: {T}, {T2} users per node  |  "
-        f"Namespace: {args.namespace_pattern}  |  Timezone: {args.timezone}\n"
+        f"Namespace: {args.namespace_pattern}  |  Timezone: {args.timezone}"
+    )
+    print(
+        f"\nColumn legend:\n"
+        f"  Peak     highest concurrent users observed\n"
+        f"  Active   unique users with a running server (7-day rolling window)\n"
+        f"  Hrs>{T}  hours where concurrent users exceeded {T} (node capacity)\n"
+        f"  Hrs>{T2}  hours where concurrent users exceeded {T2} (1.5x node capacity)\n"
+        f"  Avg      average concurrent users in the time bucket\n"
+        f"  Pct>{T}  % of samples where concurrent users exceeded {T}\n"
+        f"  Chart    bar chart; each # = 5 users"
     )
 
     report = {
