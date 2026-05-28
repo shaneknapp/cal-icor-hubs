@@ -119,7 +119,7 @@ def format_text(report):
     T2 = report["threshold2"]
     lines = []
 
-    lines.append("Cal-ICOR JupyterHub Concurrent User Report")
+    lines.append("JupyterHub Concurrent User Report")
     lines.append(f"Generated: {report['generated']}")
     lines.append(
         f"Range: last {days} days  |  Threshold: {T} users per node"
@@ -197,7 +197,7 @@ def format_markdown(report):
     T2 = report["threshold2"]
     lines = []
 
-    lines.append("# Cal-ICOR JupyterHub Concurrent User Report")
+    lines.append("# JupyterHub Concurrent User Report")
     lines.append("")
     lines.append(f"**Generated:** {report['generated']}  ")
     lines.append(
@@ -278,7 +278,7 @@ def format_html(report):
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Cal-ICOR Concurrent Users Report</title>
+  <title>Jupyterhub Concurrent Users Report</title>
   <style>
     body {{ font-family: sans-serif; max-width: 960px; margin: 2em auto; padding: 0 1em; color: #222; }}
     h1 {{ font-size: 1.4em; }}
@@ -293,7 +293,7 @@ def format_html(report):
   </style>
 </head>
 <body>
-<h1>Cal-ICOR JupyterHub Concurrent User Report</h1>
+<h1>JupyterHub Concurrent User Report</h1>
 <p class="meta">
   Generated: {report["generated"]} &nbsp;|&nbsp;
   Range: last {days} days &nbsp;|&nbsp;
