@@ -19,6 +19,7 @@ Optional arguments:
 """
 
 import argparse
+import calendar
 import json
 import sys
 import time
@@ -30,7 +31,7 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
-DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+DAYS_OF_WEEK = list(calendar.day_abbr)
 
 
 def query(url, promql):
