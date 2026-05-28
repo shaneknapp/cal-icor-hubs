@@ -5,9 +5,9 @@ Query Prometheus for concurrent JupyterHub user statistics across all prod hubs.
 Requires an active port-forward to the Prometheus server:
     kubectl -n support port-forward deployment/support-prometheus-server 9090
 
-kubectl will print "Handling connection for 9090" to stderr for each request.
-To suppress it, redirect stderr when starting the port-forward:
-    kubectl -n support port-forward deployment/support-prometheus-server 9090 2>/dev/null &
+kubectl will print "Handling connection for 9090" to stdout for each request.
+To suppress it, redirect both stdout and stderr when starting the port-forward:
+    kubectl -n support port-forward deployment/support-prometheus-server 9090 >/dev/null 2>&1 &
 
 Then run:
     python3 scripts/query_concurrent_users.py
@@ -59,7 +59,7 @@ def query(url, promql):
         print(f"Error connecting to Prometheus at {url}: {e}")
         print(
             "Is the port-forward running?\n"
-            "    kubectl -n support port-forward deployment/support-prometheus-server 9090"
+            "    kubectl -n support port-forward deployment/support-prometheus-server 9090 >/dev/null 2>&1 &"
         )
         sys.exit(1)
 
@@ -74,7 +74,7 @@ def query_range(url, promql, start, end, step):
         print(f"Error connecting to Prometheus at {url}: {e}")
         print(
             "Is the port-forward running?\n"
-            "    kubectl -n support port-forward deployment/support-prometheus-server 9090"
+            "    kubectl -n support port-forward deployment/support-prometheus-server 9090 >/dev/null 2>&1 &"
         )
         sys.exit(1)
 
