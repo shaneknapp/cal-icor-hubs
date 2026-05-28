@@ -655,7 +655,6 @@ if __name__ == "__main__":
         help="Save a report to scripts/reports/ in the specified format (md and markdown are equivalent)",
     )
     parser.add_argument(
-        "-d",
         "--debug",
         action="store_true",
         help="Print each Prometheus query and sample counts as the script runs",
