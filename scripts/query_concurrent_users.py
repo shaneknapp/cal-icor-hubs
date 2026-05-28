@@ -5,6 +5,10 @@ Query Prometheus for concurrent JupyterHub user statistics across all prod hubs.
 Requires an active port-forward to the Prometheus server:
     kubectl -n support port-forward deployment/support-prometheus-server 9090
 
+kubectl will print "Handling connection for 9090" to stderr for each request.
+To suppress it, redirect stderr when starting the port-forward:
+    kubectl -n support port-forward deployment/support-prometheus-server 9090 2>/dev/null &
+
 Then run:
     python3 scripts/query_concurrent_users.py
 
@@ -19,6 +23,7 @@ Optional arguments:
     --save-report         Optionally save a report to scripts/reports/: text, markdown (or md), or html
     --config              Path to a YAML config file. Any key matching a CLI arg sets its default;
                           explicit CLI args always win.
+    --debug               Print each Prometheus query and sample counts as the script runs.
 
 Example config file (my-deployment.yaml):
     namespace_pattern: ".*-staging"
@@ -409,6 +414,8 @@ def main(args):
     # -------------------------------------------------------------------------
     section(f"Overall statistics (last {args.days} days)")
 
+    if args.debug:
+        print("  [debug] querying overall peak concurrent users")
     data = query(
         args.url,
         f"max_over_time(sum(jupyterhub_running_servers{{{ns_filter}}}){subquery})",
@@ -418,6 +425,8 @@ def main(args):
     report["overall"]["peak"] = peak
 
     for n in [T, T2]:
+        if args.debug:
+            print(f"  [debug] querying % of time above {n} users")
         data = query(
             args.url,
             f"sum_over_time((sum(jupyterhub_running_servers{{{ns_filter}}}) > bool {n}){subquery})"
@@ -438,6 +447,8 @@ def main(args):
     # -------------------------------------------------------------------------
     section(f"Per-namespace peak concurrent users (last {args.days} days)")
 
+    if args.debug:
+        print("  [debug] querying per-namespace peak concurrent users")
     data = query(
         args.url, f"max_over_time(jupyterhub_running_servers{{{ns_filter}}}{subquery})"
     )
@@ -460,9 +471,13 @@ def main(args):
     # -------------------------------------------------------------------------
     # Fetch range data once for the remaining analyses (30m resolution)
     # -------------------------------------------------------------------------
+    if args.debug:
+        print(f"\n  [debug] fetching {args.days}d of range samples at 30m resolution")
     samples = get_range_samples(
         args.url, args.days, args.timezone, args.namespace_pattern
     )
+    if args.debug:
+        print(f"  [debug] got {len(samples)} samples")
 
     # -------------------------------------------------------------------------
     # Section 3: Week-by-week breakdown
@@ -470,6 +485,10 @@ def main(args):
     section("Week-by-week breakdown (Mon–Sun, local time)")
 
     # Fetch weekly active users: last sample per week gives WAU for that week
+    if args.debug:
+        print(
+            "  [debug] fetching weekly active users (jupyterhub_active_users{period='7d'})"
+        )
     _end_ts = int(time.time())
     _start_ts = _end_ts - args.days * 86400
     _tz = ZoneInfo(args.timezone)
@@ -485,6 +504,8 @@ def main(args):
         _dt = datetime.fromtimestamp(int(_ts), tz=_tz)
         _wk = (_dt - timedelta(days=_dt.weekday())).strftime("%Y-%m-%d")
         week_active_users[_wk] = int(float(_val))
+    if args.debug:
+        print(f"  [debug] got WAU data for {len(week_active_users)} weeks")
 
     week_samples = defaultdict(list)
     for dt, v in samples:
@@ -632,6 +653,12 @@ if __name__ == "__main__":
         "--save-report",
         choices=["text", "markdown", "md", "html"],
         help="Save a report to scripts/reports/ in the specified format (md and markdown are equivalent)",
+    )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        help="Print each Prometheus query and sample counts as the script runs",
     )
 
     if config_defaults:
