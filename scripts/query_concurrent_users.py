@@ -9,13 +9,21 @@ Then run:
     python3 scripts/query_concurrent_users.py
 
 Optional arguments:
-    --days           Number of days to look back (default: 90)
-    --step           Query resolution step for instant queries (default: 5m)
-    --url            Prometheus URL (default: http://localhost:9090)
-    --threshold      User count threshold for "above N users" stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.
-    --timezone       IANA timezone for local time display, should match hub users' location
-                     (default: America/Los_Angeles)
-    --save-report    Optionally save a report to scripts/reports/: text, markdown (or md), or html
+    --days                Number of days to look back (default: 90)
+    --step                Query resolution step for instant queries (default: 5m)
+    --url                 Prometheus URL (default: http://localhost:9090)
+    --threshold           User count threshold for "above N users" stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.
+    --timezone            IANA timezone for local time display, should match hub users' location
+                          (default: America/Los_Angeles)
+    --namespace-pattern   Prometheus regex to match hub namespaces (default: .*-prod)
+    --save-report         Optionally save a report to scripts/reports/: text, markdown (or md), or html
+    --config              Path to a YAML config file. Any key matching a CLI arg sets its default;
+                          explicit CLI args always win. Requires ruamel.yaml (pip install ruamel.yaml).
+
+Example config file (my-deployment.yaml):
+    namespace_pattern: ".*-staging"
+    timezone: "America/New_York"
+    threshold: 60
 """
 
 import argparse
@@ -30,6 +38,8 @@ from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
+
+from ruamel.yaml import YAML
 
 DAYS_OF_WEEK = list(calendar.day_abbr)
 
@@ -70,7 +80,7 @@ def query_range(url, promql, start, end, step):
     return data["data"]["result"][0]["values"]
 
 
-def get_range_samples(url, days, tz_name):
+def get_range_samples(url, days, tz_name, namespace_pattern):
     """
     Fetch total running servers at 30m resolution over the given number of days.
     Returns a list of (datetime_local, value) tuples, converted to tz_name.
@@ -79,10 +89,10 @@ def get_range_samples(url, days, tz_name):
     start = end - days * 86400
     tz = ZoneInfo(tz_name)
 
-    # 148 days at 30m = ~7104 samples, well within the 11000-point limit
+    # 90 days at 30m = ~4320 samples, well within the 11000-point limit
     values = query_range(
         url,
-        'sum(jupyterhub_running_servers{namespace=~".*-prod"})',
+        f'sum(jupyterhub_running_servers{{namespace=~"{namespace_pattern}"}})',
         start,
         end,
         step=1800,
@@ -364,7 +374,7 @@ def write_report(report, fmt, script_dir):
 def main(args):
     window = f"{args.days}d"
     subquery = f"[{window}:{args.step}]"
-    ns_filter = 'namespace=~".*-prod"'
+    ns_filter = f'namespace=~"{args.namespace_pattern}"'
     T = args.threshold
     T2 = T + 40
 
@@ -442,7 +452,9 @@ def main(args):
     # -------------------------------------------------------------------------
     # Fetch range data once for the remaining analyses (30m resolution)
     # -------------------------------------------------------------------------
-    samples = get_range_samples(args.url, args.days, args.timezone)
+    samples = get_range_samples(
+        args.url, args.days, args.timezone, args.namespace_pattern
+    )
 
     # -------------------------------------------------------------------------
     # Section 3: Week-by-week breakdown
@@ -530,8 +542,23 @@ def main(args):
 
 
 if __name__ == "__main__":
+    # Pre-parse to get --config before setting up the full parser, so config
+    # file values can be applied as defaults before argparse sees the rest.
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("-c", "--config")
+    pre_args, _ = pre.parse_known_args()
+
+    config_defaults = {}
+    if pre_args.config:
+        _yaml = YAML(typ="safe")
+        with open(pre_args.config) as f:
+            config_defaults = _yaml.load(f) or {}
+
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-c", "--config", metavar="FILE", help="Path to a YAML config file"
     )
     parser.add_argument(
         "-d", "--days", type=int, default=90, help="Days to look back (default: 90)"
@@ -561,9 +588,19 @@ if __name__ == "__main__":
         help="IANA timezone for local time display, should match hub users' location (default: America/Los_Angeles)",
     )
     parser.add_argument(
+        "-n",
+        "--namespace-pattern",
+        default=".*-prod",
+        help="Prometheus regex to match hub namespaces (default: .*-prod)",
+    )
+    parser.add_argument(
         "-r",
         "--save-report",
         choices=["text", "markdown", "md", "html"],
         help="Save a report to scripts/reports/ in the specified format (md and markdown are equivalent)",
     )
+
+    if config_defaults:
+        parser.set_defaults(**config_defaults)
+
     main(parser.parse_args())
