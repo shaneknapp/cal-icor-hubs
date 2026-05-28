@@ -715,4 +715,6 @@ if __name__ == "__main__":
     if config_defaults:
         parser.set_defaults(**config_defaults)
 
-    main(parser.parse_args())
+    args = parser.parse_args()
+
+    main(args)
