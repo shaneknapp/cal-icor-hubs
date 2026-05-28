@@ -122,7 +122,7 @@ def format_text(report):
     lines.append("Cal-ICOR JupyterHub Concurrent User Report")
     lines.append(f"Generated: {report['generated']}")
     lines.append(
-        f"Range: last {days} days  |  Threshold: {T} users"
+        f"Range: last {days} days  |  Threshold: {T} users per node"
         f"  |  Timezone: {report['timezone']}"
     )
 
@@ -202,7 +202,7 @@ def format_markdown(report):
     lines.append(f"**Generated:** {report['generated']}  ")
     lines.append(
         f"**Range:** last {days} days  |  "
-        f"**Threshold:** {T} users  |  "
+        f"**Threshold:** {T} users per node  |  "
         f"**Timezone:** {report['timezone']}"
     )
     lines.append("")
@@ -297,7 +297,7 @@ def format_html(report):
 <p class="meta">
   Generated: {report["generated"]} &nbsp;|&nbsp;
   Range: last {days} days &nbsp;|&nbsp;
-  Threshold: {T} users &nbsp;|&nbsp;
+  Threshold: {T} users per node &nbsp;|&nbsp;
   Timezone: {report["timezone"]}
 </p>"""
     )
@@ -379,7 +379,7 @@ def main(args):
     T2 = T + 40
 
     print(f"Querying {args.url} over the last {args.days} days")
-    print(f"Threshold: {T} users  |  Timezone: {args.timezone}\n")
+    print(f"Threshold: {T} users per node  |  Timezone: {args.timezone}\n")
 
     report = {
         "generated": datetime.now(ZoneInfo(args.timezone)).strftime(
