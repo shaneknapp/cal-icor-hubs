@@ -9,7 +9,7 @@ Then run:
     python3 scripts/query_concurrent_users.py
 
 Optional arguments:
-    --days           Number of days to look back (default: 148)
+    --days           Number of days to look back (default: 90)
     --step           Query resolution step for instant queries (default: 5m)
     --url            Prometheus URL (default: http://localhost:9090)
     --threshold      User count threshold for "above N users" stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.
@@ -24,7 +24,7 @@ import json
 import sys
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.error import URLError
 from urllib.parse import urlencode
@@ -372,7 +372,9 @@ def main(args):
     print(f"Threshold: {T} users  |  Timezone: {args.timezone}\n")
 
     report = {
-        "generated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "generated": datetime.now(ZoneInfo(args.timezone)).strftime(
+            "%Y-%m-%d %H:%M %Z"
+        ),
         "days": args.days,
         "threshold": T,
         "threshold2": T2,
@@ -532,7 +534,7 @@ if __name__ == "__main__":
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "-d", "--days", type=int, default=148, help="Days to look back (default: 148)"
+        "-d", "--days", type=int, default=90, help="Days to look back (default: 90)"
     )
     parser.add_argument(
         "--step",
