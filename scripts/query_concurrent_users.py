@@ -122,8 +122,8 @@ def format_text(report):
     lines.append("JupyterHub Concurrent User Report")
     lines.append(f"Generated: {report['generated']}")
     lines.append(
-        f"Range: last {days} days  |  Threshold: {T} users per node"
-        f"  |  Timezone: {report['timezone']}"
+        f"Range: last {days} days  |  Thresholds: {T}, {T2} users per node"
+        f"  |  Namespace: {report['namespace_pattern']}  |  Timezone: {report['timezone']}"
     )
 
     lines.append(f"\n{'=' * 60}")
@@ -132,14 +132,14 @@ def format_text(report):
     lines.append(f"  Peak concurrent users (all hubs): {report['overall']['peak']}")
     for a in report["overall"]["above"]:
         lines.append(
-            f"  Fraction of time above {a['n']:>3} users: "
+            f"  % of time above {a['n']:>3} users per node: "
             f"{a['pct']:5.2f}%  (~{a['hours']:.1f} hours total)"
         )
 
     lines.append(f"\n{'=' * 60}")
-    lines.append(f"  Per-hub peak concurrent users (last {days} days)")
+    lines.append(f"  Per-namespace peak concurrent users (last {days} days)")
     lines.append(f"{'=' * 60}")
-    lines.append(f"  {'Hub':<28} {'Peak':>5}  Chart")
+    lines.append(f"  {'Namespace':<28} {'Peak':>5}  Chart")
     lines.append(f"  {'-' * 28} {'-' * 5}  -----")
     for hub, val in report["hubs"]:
         bar = "#" * (val // 5)
@@ -151,14 +151,14 @@ def format_text(report):
     lines.append("  Week-by-week breakdown (Mon-Sun, local time)")
     lines.append(f"{'=' * 60}")
     lines.append(
-        f"  {'Week of':<12} {'Peak':>5}  {'Avg':>5}  "
+        f"  {'Week of':<12} {'Peak':>5}  {'Active':>6}  "
         f"{hrs_t_col:>7}  {hrs_t2_col:>8}  Chart"
     )
-    lines.append(f"  {'-' * 12} {'-' * 5}  {'-' * 5}  {'-' * 7}  {'-' * 8}  -----")
+    lines.append(f"  {'-' * 12} {'-' * 5}  {'-' * 6}  {'-' * 7}  {'-' * 8}  -----")
     for w in report["weeks"]:
         bar = "#" * (w["peak"] // 5)
         lines.append(
-            f"  {w['week']:<12} {w['peak']:>5}  {w['avg']:>5.1f}  "
+            f"  {w['week']:<12} {w['peak']:>5}  {w['active']:>6}  "
             f"{w['hrs_t']:>6.1f}h  {w['hrs_t2']:>7.1f}h  {bar}"
         )
 
@@ -202,7 +202,8 @@ def format_markdown(report):
     lines.append(f"**Generated:** {report['generated']}  ")
     lines.append(
         f"**Range:** last {days} days  |  "
-        f"**Threshold:** {T} users per node  |  "
+        f"**Thresholds:** {T}, {T2} users per node  |  "
+        f"**Namespace:** {report['namespace_pattern']}  |  "
         f"**Timezone:** {report['timezone']}"
     )
     lines.append("")
@@ -214,14 +215,14 @@ def format_markdown(report):
     lines.append(f"| Peak concurrent users | **{report['overall']['peak']}** |")
     for a in report["overall"]["above"]:
         lines.append(
-            f"| Fraction of time above {a['n']} users"
+            f"| % of time above {a['n']} users per node"
             f" | {a['pct']:.2f}% (~{a['hours']:.1f} hours) |"
         )
     lines.append("")
 
-    lines.append(f"## Per-hub peak concurrent users (last {days} days)")
+    lines.append(f"## Per-namespace peak concurrent users (last {days} days)")
     lines.append("")
-    lines.append("| Hub | Peak |")
+    lines.append("| Namespace | Peak |")
     lines.append("|---|---|")
     for hub, val in report["hubs"]:
         lines.append(f"| {hub} | {val} |")
@@ -229,11 +230,11 @@ def format_markdown(report):
 
     lines.append("## Week-by-week breakdown (Mon-Sun, local time)")
     lines.append("")
-    lines.append(f"| Week of | Peak | Avg | Hrs > {T} | Hrs > {T2} |")
+    lines.append(f"| Week of | Peak | Active | Hrs > {T} | Hrs > {T2} |")
     lines.append("|---|---|---|---|---|")
     for w in report["weeks"]:
         lines.append(
-            f"| {w['week']} | {w['peak']} | {w['avg']:.1f}"
+            f"| {w['week']} | {w['peak']} | {w['active']}"
             f" | {w['hrs_t']:.1f}h | {w['hrs_t2']:.1f}h |"
         )
     lines.append("")
@@ -278,7 +279,7 @@ def format_html(report):
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Jupyterhub Concurrent Users Report</title>
+  <title>JupyterHub Concurrent User Report</title>
   <style>
     body {{ font-family: sans-serif; max-width: 960px; margin: 2em auto; padding: 0 1em; color: #222; }}
     h1 {{ font-size: 1.4em; }}
@@ -297,7 +298,8 @@ def format_html(report):
 <p class="meta">
   Generated: {report["generated"]} &nbsp;|&nbsp;
   Range: last {days} days &nbsp;|&nbsp;
-  Threshold: {T} users per node &nbsp;|&nbsp;
+  Thresholds: {T}, {T2} users per node &nbsp;|&nbsp;
+  Namespace: {report["namespace_pattern"]} &nbsp;|&nbsp;
   Timezone: {report["timezone"]}
 </p>"""
     )
@@ -310,27 +312,29 @@ def format_html(report):
     for a in report["overall"]["above"]:
         parts.append(
             td(
-                f"Fraction of time above {a['n']} users",
+                f"% of time above {a['n']} users per node",
                 f"{a['pct']:.2f}% (~{a['hours']:.1f} hours)",
             )
         )
     parts.append("</table>")
 
-    parts.append(f"<h2>Per-hub peak concurrent users (last {days} days)</h2><table>")
-    parts.append(th("Hub", "Peak", "Chart"))
+    parts.append(
+        f"<h2>Per-namespace peak concurrent users (last {days} days)</h2><table>"
+    )
+    parts.append(th("Namespace", "Peak", "Chart"))
     for hub, val in report["hubs"]:
         bar = "#" * (val // 5)
         parts.append(td(hub, val, f'<span class="bar">{bar}</span>'))
     parts.append("</table>")
 
     parts.append("<h2>Week-by-week breakdown (Mon-Sun, local time)</h2><table>")
-    parts.append(th("Week of", "Peak", "Avg", f"Hrs &gt; {T}", f"Hrs &gt; {T2}"))
+    parts.append(th("Week of", "Peak", "Active", f"Hrs &gt; {T}", f"Hrs &gt; {T2}"))
     for w in report["weeks"]:
         parts.append(
             td(
                 w["week"],
                 w["peak"],
-                f"{w['avg']:.1f}",
+                w["active"],
                 f"{w['hrs_t']:.1f}h",
                 f"{w['hrs_t2']:.1f}h",
             )
@@ -379,7 +383,10 @@ def main(args):
     T2 = T + 40
 
     print(f"Querying {args.url} over the last {args.days} days")
-    print(f"Threshold: {T} users per node  |  Timezone: {args.timezone}\n")
+    print(
+        f"Thresholds: {T}, {T2} users per node  |  "
+        f"Namespace: {args.namespace_pattern}  |  Timezone: {args.timezone}\n"
+    )
 
     report = {
         "generated": datetime.now(ZoneInfo(args.timezone)).strftime(
@@ -389,6 +396,7 @@ def main(args):
         "threshold": T,
         "threshold2": T2,
         "timezone": args.timezone,
+        "namespace_pattern": args.namespace_pattern,
         "overall": {"peak": None, "above": []},
         "hubs": [],
         "weeks": [],
@@ -418,7 +426,7 @@ def main(args):
         frac = float(data["data"]["result"][0]["value"][1])
         hours_above = frac * args.days * 24
         print(
-            f"  Fraction of time above {n:>3} users: "
+            f"  % of time above {n:>3} users per node: "
             f"{frac * 100:5.2f}%  (~{hours_above:.1f} hours total)"
         )
         report["overall"]["above"].append(
@@ -428,7 +436,7 @@ def main(args):
     # -------------------------------------------------------------------------
     # Section 2: Per-hub peak
     # -------------------------------------------------------------------------
-    section(f"Per-hub peak concurrent users (last {args.days} days)")
+    section(f"Per-namespace peak concurrent users (last {args.days} days)")
 
     data = query(
         args.url, f"max_over_time(jupyterhub_running_servers{{{ns_filter}}}{subquery})"
@@ -440,7 +448,7 @@ def main(args):
         if val > hubs.get(ns, 0):
             hubs[ns] = val
 
-    print(f"  {'Hub':<28} {'Peak':>5}  Chart")
+    print(f"  {'Namespace':<28} {'Peak':>5}  Chart")
     print(f"  {'-' * 28} {'-' * 5}  -----")
     for hub, val in sorted(hubs.items(), key=lambda x: -x[1]):
         if val == 0:
@@ -461,30 +469,55 @@ def main(args):
     # -------------------------------------------------------------------------
     section("Week-by-week breakdown (Mon–Sun, local time)")
 
+    # Fetch weekly active users: last sample per week gives WAU for that week
+    _end_ts = int(time.time())
+    _start_ts = _end_ts - args.days * 86400
+    _tz = ZoneInfo(args.timezone)
+    _au_vals = query_range(
+        args.url,
+        f'sum(max(jupyterhub_active_users{{period="7d", {ns_filter}}}) by (namespace))',
+        _start_ts,
+        _end_ts,
+        step=1800,
+    )
+    week_active_users = {}
+    for _ts, _val in _au_vals:
+        _dt = datetime.fromtimestamp(int(_ts), tz=_tz)
+        _wk = (_dt - timedelta(days=_dt.weekday())).strftime("%Y-%m-%d")
+        week_active_users[_wk] = int(float(_val))
+
     week_samples = defaultdict(list)
     for dt, v in samples:
         week_start = dt - timedelta(days=dt.weekday())
         week_samples[week_start.strftime("%Y-%m-%d")].append(v)
 
+    hrs_t_col = f"Hrs>{T}"
+    hrs_t2_col = f"Hrs>{T2}"
     print(
-        f"  {'Week of':<12} {'Peak':>5}  {'Avg':>5}  "
-        f"{'Hrs>{T}':>7}  {'Hrs>{T2}':>8}  Chart"
+        f"  {'Week of':<12} {'Peak':>5}  {'Active':>6}  "
+        f"{hrs_t_col:>7}  {hrs_t2_col:>8}  Chart"
     )
-    print(f"  {'-' * 12} {'-' * 5}  {'-' * 5}  {'-' * 7}  {'-' * 8}  -----")
+    print(f"  {'-' * 12} {'-' * 5}  {'-' * 6}  {'-' * 7}  {'-' * 8}  -----")
     for week in sorted(week_samples):
         s = week_samples[week]
         wpeak = max(s)
-        wavg = sum(s) / len(s)
+        active = week_active_users.get(week, 0)
         # each sample = 30 min
         hrs_t = sum(1 for v in s if v > T) * 0.5
         hrs_t2 = sum(1 for v in s if v > T2) * 0.5
         bar = "#" * (wpeak // 5)
         print(
-            f"  {week:<12} {wpeak:>5}  {wavg:>5.1f}  "
+            f"  {week:<12} {wpeak:>5}  {active:>6}  "
             f"{hrs_t:>6.1f}h  {hrs_t2:>7.1f}h  {bar}"
         )
         report["weeks"].append(
-            {"week": week, "peak": wpeak, "avg": wavg, "hrs_t": hrs_t, "hrs_t2": hrs_t2}
+            {
+                "week": week,
+                "peak": wpeak,
+                "active": active,
+                "hrs_t": hrs_t,
+                "hrs_t2": hrs_t2,
+            }
         )
 
     # -------------------------------------------------------------------------
@@ -496,7 +529,8 @@ def main(args):
     for dt, v in samples:
         hour_samples[dt.hour].append(v)
 
-    print(f"  {'Hour':<10} {'Peak':>5}  {'Avg':>5}  {'Pct>{T}':>8}  Chart")
+    pct_col = f"Pct>{T}"
+    print(f"  {'Hour':<10} {'Peak':>5}  {'Avg':>5}  {pct_col:>8}  Chart")
     print(f"  {'-' * 10} {'-' * 5}  {'-' * 5}  {'-' * 8}  -----")
     for h in range(24):
         s = hour_samples[h]
@@ -506,7 +540,7 @@ def main(args):
         havg = sum(s) / len(s)
         pct = sum(1 for v in s if v > T) / len(s) * 100
         bar = "#" * (hpeak // 5)
-        label = f"{h:02d}:00-{h + 1:02d}:00"
+        label = f"{h:02d}:00-{(h + 1) % 24:02d}:00"
         print(f"  {label:<10} {hpeak:>5}  {havg:>5.1f}  {pct:>7.1f}%  {bar}")
         report["hours"].append({"label": label, "peak": hpeak, "avg": havg, "pct": pct})
 
@@ -519,7 +553,7 @@ def main(args):
     for dt, v in samples:
         dow_samples[dt.weekday()].append(v)
 
-    print(f"  {'Day':<5} {'Peak':>5}  {'Avg':>5}  {'Pct>{T}':>8}  Chart")
+    print(f"  {'Day':<5} {'Peak':>5}  {'Avg':>5}  {pct_col:>8}  Chart")
     print(f"  {'-' * 5} {'-' * 5}  {'-' * 5}  {'-' * 8}  -----")
     for d in range(7):
         s = dow_samples[d]
