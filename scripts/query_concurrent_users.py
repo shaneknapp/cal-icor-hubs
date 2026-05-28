@@ -18,7 +18,7 @@ Optional arguments:
     --namespace-pattern   Prometheus regex to match hub namespaces (default: .*-prod)
     --save-report         Optionally save a report to scripts/reports/: text, markdown (or md), or html
     --config              Path to a YAML config file. Any key matching a CLI arg sets its default;
-                          explicit CLI args always win. Requires ruamel.yaml (pip install ruamel.yaml).
+                          explicit CLI args always win.
 
 Example config file (my-deployment.yaml):
     namespace_pattern: ".*-staging"
