@@ -121,8 +121,7 @@ def prom_query(url, promql, time=None):
     except URLError as e:
         print(f"Error connecting to Prometheus at {url}: {e}")
         print(
-            "Is the port-forward running?\n"
-            "    kubectl -n support port-forward deployment/support-prometheus-server 9090 >/dev/null 2>&1 &"
+            "Is the port-forward to Prometheus running? See the docstring for setup instructions."
         )
         sys.exit(1)
 
@@ -136,8 +135,7 @@ def query_range(url, promql, start, end, step):
     except URLError as e:
         print(f"Error connecting to Prometheus at {url}: {e}")
         print(
-            "Is the port-forward running?\n"
-            "    kubectl -n support port-forward deployment/support-prometheus-server 9090 >/dev/null 2>&1 &"
+            "Is the port-forward to Prometheus running? See the docstring for setup instructions."
         )
         sys.exit(1)
 
