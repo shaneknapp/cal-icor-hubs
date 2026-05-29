@@ -2,7 +2,8 @@
 """
 Query Prometheus for concurrent JupyterHub user statistics across all prod hubs.
 
-Requires an active port-forward to the Prometheus server:
+Requires an active port-forward to the Prometheus server (you may need to change
+the namespace or deployment name if your setup differs):
     kubectl -n support port-forward deployment/support-prometheus-server 9090
 
 kubectl will print "Handling connection for 9090" to stdout for each request.
@@ -25,11 +26,13 @@ Optional arguments:
                           window. Does not affect the time-series data returned for the
                           hourly/daily/weekly breakdown tables. (default: 5m)
     --url                 Prometheus URL (default: http://localhost:9090)
-    --threshold           User count threshold for "above N users" stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.
+    --threshold           User count threshold for "above N users" stats (default: 80).
+                          Roughly the total users a single node with ~64GB RAM can support.
     --timezone            IANA timezone for local time display, should match hub users' location
                           (default: America/Los_Angeles)
     --namespace-pattern   Prometheus regex to match hub namespaces (default: .*-prod)
-    --save-report         Optionally save a report to scripts/reports/: text, markdown (or md), or html
+    --save-report         Optionally save a report to scripts/reports/: text,
+                          markdown (or md), or html
     --config              Path to a YAML config file. Any key matching a CLI arg sets its default;
                           explicit CLI args always win.
     --debug               Print each Prometheus query and sample counts as the script runs.
@@ -68,7 +71,7 @@ Examples:
     python3 scripts/query_concurrent_users.py \\
         --start "2026-02-01" --end "2026-03-01"
 
-    # Midterm week deep-dive — 5-day span, 5-minute sample interval for maximum granularity
+    # Midterm week deep-dive — 5-day span, 5-minute sample interval for max granularity
     python3 scripts/query_concurrent_users.py \\
         --start "2026-03-09 00:00" --end "2026-03-13 23:59"
 
@@ -831,13 +834,19 @@ if __name__ == "__main__":
         "--threshold",
         type=int,
         default=80,
-        help="User count threshold for percentage/hours stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.",
+        help=(
+            "User count threshold for percentage/hours stats (default: 80). "
+            "Roughly the total users a single node with ~64GB RAM can support."
+        ),
     )
     parser.add_argument(
         "-z",
         "--timezone",
         default="America/Los_Angeles",
-        help="IANA timezone for local time display, should match hub users' location (default: America/Los_Angeles)",
+        help=(
+            "IANA timezone for local time display, should match hub users' location "
+            "(default: America/Los_Angeles)"
+        ),
     )
     parser.add_argument(
         "-n",
