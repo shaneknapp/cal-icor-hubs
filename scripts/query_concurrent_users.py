@@ -33,8 +33,8 @@ Optional arguments:
     --namespace-pattern   Prometheus regex to match hub namespaces (default: .*-prod)
     --save-report         Optionally save a report to scripts/reports/: text,
                           markdown (or md), or html
-    --config              Path to a YAML config file. Any key matching a CLI arg sets its default;
-                          explicit CLI args always win.
+    --config              Path to a YAML config file. Any key matching a CLI
+                          arg sets its default; explicit CLI args always win.
     --debug               Print each Prometheus query and sample counts as the script runs.
 
 Two independent resolutions are used per run:
@@ -169,6 +169,7 @@ def get_range_samples(
 
 
 def section(title):
+    """Print a titled section header to stdout."""
     print(f"\n{'=' * 60}")
     print(f"  {title}")
     print(f"{'=' * 60}")
@@ -178,13 +179,13 @@ def format_text(report):
     """Render report data as plain text (mirrors stdout output)."""
     T = report["threshold"]
     T2 = report["threshold2"]
-    rl = report["range_label"]
+    range_label = report["range_label"]
     lines = []
 
     lines.append("JupyterHub Concurrent User Report")
     lines.append(f"Generated: {report['generated']}")
     lines.append(
-        f"Range: {rl}  |  Thresholds: {T}, {T2} users per node"
+        f"Range: {range_label}  |  Thresholds: {T}, {T2} users per node"
         f"  |  Namespace: {report['namespace_pattern']}  |  Timezone: {report['timezone']}"
     )
     lines.append(
@@ -199,7 +200,7 @@ def format_text(report):
     )
 
     lines.append(f"\n{'=' * 60}")
-    lines.append(f"  Overall statistics ({rl})")
+    lines.append(f"  Overall statistics ({range_label})")
     lines.append(f"{'=' * 60}")
     lines.append(f"  Peak concurrent users (all hubs): {report['overall']['peak']}")
     for a in report["overall"]["above"]:
@@ -209,7 +210,7 @@ def format_text(report):
         )
 
     lines.append(f"\n{'=' * 60}")
-    lines.append(f"  Per-namespace peak concurrent users ({rl})")
+    lines.append(f"  Per-namespace peak concurrent users ({range_label})")
     lines.append(f"{'=' * 60}")
     lines.append(f"  {'Namespace':<28} {'Peak':>5}  Chart")
     lines.append(f"  {'-' * 28} {'-' * 5}  -----")
@@ -269,14 +270,14 @@ def format_markdown(report):
     """Render report data as Markdown."""
     T = report["threshold"]
     T2 = report["threshold2"]
-    rl = report["range_label"]
+    range_label = report["range_label"]
     lines = []
 
     lines.append("# JupyterHub Concurrent User Report")
     lines.append("")
     lines.append(f"**Generated:** {report['generated']}  ")
     lines.append(
-        f"**Range:** {rl}  |  "
+        f"**Range:** {range_label}  |  "
         f"**Thresholds:** {T}, {T2} users per node  |  "
         f"**Namespace:** {report['namespace_pattern']}  |  "
         f"**Timezone:** {report['timezone']}"
@@ -301,7 +302,7 @@ def format_markdown(report):
     lines.append("| Chart | Bar chart; each # = 5 users |")
     lines.append("")
 
-    lines.append(f"## Overall statistics ({rl})")
+    lines.append(f"## Overall statistics ({range_label})")
     lines.append("")
     lines.append("| Metric | Value |")
     lines.append("|---|---|")
@@ -313,7 +314,7 @@ def format_markdown(report):
         )
     lines.append("")
 
-    lines.append(f"## Per-namespace peak concurrent users ({rl})")
+    lines.append(f"## Per-namespace peak concurrent users ({range_label})")
     lines.append("")
     lines.append("| Namespace | Peak |")
     lines.append("|---|---|")
@@ -360,7 +361,7 @@ def format_html(report):
     """Render report data as a self-contained HTML document."""
     T = report["threshold"]
     T2 = report["threshold2"]
-    rl = report["range_label"]
+    range_label = report["range_label"]
 
     def th(*cells):
         return "<tr>" + "".join(f"<th>{c}</th>" for c in cells) + "</tr>"
@@ -392,7 +393,7 @@ def format_html(report):
 <h1>JupyterHub Concurrent User Report</h1>
 <p class="meta">
   Generated: {report["generated"]} &nbsp;|&nbsp;
-  Range: {rl} &nbsp;|&nbsp;
+  Range: {range_label} &nbsp;|&nbsp;
   Thresholds: {T}, {T2} users per node &nbsp;|&nbsp;
   Namespace: {report["namespace_pattern"]} &nbsp;|&nbsp;
   Timezone: {report["timezone"]}
@@ -412,7 +413,7 @@ def format_html(report):
         f"</table>"
     )
 
-    parts.append(f"<h2>Overall statistics ({rl})</h2><table>")
+    parts.append(f"<h2>Overall statistics ({range_label})</h2><table>")
     parts.append(th("Metric", "Value"))
     parts.append(
         td("Peak concurrent users", f"<strong>{report['overall']['peak']}</strong>")
@@ -426,7 +427,7 @@ def format_html(report):
         )
     parts.append("</table>")
 
-    parts.append(f"<h2>Per-namespace peak concurrent users ({rl})</h2><table>")
+    parts.append(f"<h2>Per-namespace peak concurrent users ({range_label})</h2><table>")
     parts.append(th("Namespace", "Peak", "Chart"))
     for hub, val in report["hubs"]:
         bar = "#" * (val // 5)
@@ -677,11 +678,11 @@ def main(args):
                 "  [debug] fetching weekly active users (jupyterhub_active_users{period='7d'})"
             )
             print(f"  [debug]   {wau_promql}")
-        _au_vals = query_range(args.url, wau_promql, start_ts, end_ts, step=1800)
-        for _ts, _val in _au_vals:
-            _dt = datetime.fromtimestamp(int(_ts), tz=tz)
-            _wk = (_dt - timedelta(days=_dt.weekday())).strftime("%Y-%m-%d")
-            week_active_users[_wk] = int(float(_val))
+        au_vals = query_range(args.url, wau_promql, start_ts, end_ts, step=1800)
+        for ts, val in au_vals:
+            dt = datetime.fromtimestamp(int(ts), tz=tz)
+            week_key = (dt - timedelta(days=dt.weekday())).strftime("%Y-%m-%d")
+            week_active_users[week_key] = int(float(val))
         if args.debug:
             print(f"  [debug] got WAU data for {len(week_active_users)} weeks")
     elif args.debug:
@@ -856,7 +857,10 @@ if __name__ == "__main__":
         "-r",
         "--save-report",
         choices=["text", "markdown", "md", "html"],
-        help="Save a report to scripts/reports/ in the specified format (md and markdown are equivalent)",
+        help=(
+            "Save a report to scripts/reports/ in the specified format "
+            "(md and markdown are equivalent)"
+        ),
     )
     parser.add_argument(
         "--debug",
