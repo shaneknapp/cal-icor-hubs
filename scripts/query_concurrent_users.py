@@ -13,8 +13,17 @@ Then run:
     python3 scripts/query_concurrent_users.py
 
 Optional arguments:
-    --days                Number of days to look back (default: 90)
-    --step                Query resolution step for instant queries (default: 5m)
+    --days                Number of days to look back (default: 90). Mutually exclusive
+                          with --start/--end.
+    --start               Start of the query window in local time, e.g. "2026-03-01" or
+                          "2026-03-01 08:00". Requires --end. Mutually exclusive with --days.
+    --end                 End of the query window in local time, e.g. "2026-04-15" or
+                          "2026-04-15 18:00". Requires --start. Mutually exclusive with --days.
+    --step                Sub-query resolution for instant queries (peak, % above threshold).
+                          In Prometheus subquery notation [90d:5m], this is the '5m': how
+                          finely Prometheus resamples the inner expression across the lookback
+                          window. Does not affect the time-series data returned for the
+                          hourly/daily/weekly breakdown tables. (default: 5m)
     --url                 Prometheus URL (default: http://localhost:9090)
     --threshold           User count threshold for "above N users" stats (default: 80). This is roughly the total users that a single node with ~64GB total ram can support.
     --timezone            IANA timezone for local time display, should match hub users' location
@@ -24,6 +33,44 @@ Optional arguments:
     --config              Path to a YAML config file. Any key matching a CLI arg sets its default;
                           explicit CLI args always win.
     --debug               Print each Prometheus query and sample counts as the script runs.
+
+Two independent resolutions are used per run:
+
+  1. Instant query sub-query resolution (--step, default 5m)
+     Controls how finely the peak/threshold instant queries sample across the lookback
+     window. Returns a single aggregated value, not a time series.
+
+  2. Range data sample interval (not user-configurable)
+     Controls how many data points are fetched for the hourly, daily, and week-by-week
+     breakdown tables. Auto-scales with the query window to maximise detail while staying
+     within Prometheus point limits (~11k points):
+         ≤  7 days  →  5-minute sample interval  (~2,000 points) — single-week deep-dives
+         ≤ 30 days  → 15-minute sample interval  (~2,900 points) — month-long snapshots
+         ≤ 90 days  → 30-minute sample interval  (~4,300 points) — default rolling view
+         > 90 days  → 60-minute sample interval  (~4,300 points) — semester-plus ranges
+
+Note: --start/--end ranges shorter than 7 days suppress the Active (WAU) column in
+the week-by-week table. jupyterhub_active_users always reflects a rolling 7-day window,
+so its values would extend outside the query range and be misleading for short spans.
+
+Examples:
+    # Default: last 90 days, 30-minute sample interval for breakdown tables
+    python3 scripts/query_concurrent_users.py
+
+    # Last 30 days, 15-minute sample interval
+    python3 scripts/query_concurrent_users.py -d 30
+
+    # Full spring semester — 115-day span, 60-minute sample interval
+    python3 scripts/query_concurrent_users.py \\
+        --start "2026-01-20" --end "2026-05-15" -r html
+
+    # Historical month snapshot — 30-day span, 15-minute sample interval
+    python3 scripts/query_concurrent_users.py \\
+        --start "2026-02-01" --end "2026-03-01"
+
+    # Midterm week deep-dive — 5-day span, 5-minute sample interval for maximum granularity
+    python3 scripts/query_concurrent_users.py \\
+        --start "2026-03-09 00:00" --end "2026-03-13 23:59"
 
 Example config file (my-deployment.yaml):
     namespace_pattern: ".*-staging"
@@ -35,7 +82,6 @@ import argparse
 import calendar
 import json
 import sys
-import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -49,11 +95,25 @@ from ruamel.yaml import YAML
 DAYS_OF_WEEK = list(calendar.day_abbr)
 
 
-def query(url, promql):
+def parse_local_dt(s, tz):
+    """Parse a date/datetime string in the given timezone."""
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(s, fmt).replace(tzinfo=tz)
+        except ValueError:
+            pass
+    raise argparse.ArgumentTypeError(
+        f"Cannot parse datetime {s!r}; use YYYY-MM-DD or YYYY-MM-DD HH:MM"
+    )
+
+
+def prom_query(url, promql, time=None):
     """Run an instant Prometheus query and return parsed JSON."""
-    params = urlencode({"query": promql})
+    params = {"query": promql}
+    if time is not None:
+        params["time"] = time
     try:
-        with urlopen(f"{url}/api/v1/query?{params}") as resp:
+        with urlopen(f"{url}/api/v1/query?{urlencode(params)}") as resp:
             return json.load(resp)
     except URLError as e:
         print(f"Error connecting to Prometheus at {url}: {e}")
@@ -85,23 +145,19 @@ def query_range(url, promql, start, end, step):
     return data["data"]["result"][0]["values"]
 
 
-def get_range_samples(url, days, tz_name, namespace_pattern):
+def get_range_samples(
+    url, start_ts, end_ts, tz_name, namespace_pattern, step=1800, debug=False
+):
     """
-    Fetch total running servers at 30m resolution over the given number of days.
+    Fetch total running servers over [start_ts, end_ts] at the given step (seconds).
     Returns a list of (datetime_local, value) tuples, converted to tz_name.
     """
-    end = int(time.time())
-    start = end - days * 86400
     tz = ZoneInfo(tz_name)
+    promql = f'sum(jupyterhub_running_servers{{namespace=~"{namespace_pattern}"}})'
+    if debug:
+        print(f"  [debug]   {promql}")
 
-    # 90 days at 30m = ~4320 samples, well within the 11000-point limit
-    values = query_range(
-        url,
-        f'sum(jupyterhub_running_servers{{namespace=~"{namespace_pattern}"}})',
-        start,
-        end,
-        step=1800,
-    )
+    values = query_range(url, promql, start_ts, end_ts, step=step)
 
     samples = []
     for ts, val in values:
@@ -119,15 +175,15 @@ def section(title):
 
 def format_text(report):
     """Render report data as plain text (mirrors stdout output)."""
-    days = report["days"]
     T = report["threshold"]
     T2 = report["threshold2"]
+    rl = report["range_label"]
     lines = []
 
     lines.append("JupyterHub Concurrent User Report")
     lines.append(f"Generated: {report['generated']}")
     lines.append(
-        f"Range: last {days} days  |  Thresholds: {T}, {T2} users per node"
+        f"Range: {rl}  |  Thresholds: {T}, {T2} users per node"
         f"  |  Namespace: {report['namespace_pattern']}  |  Timezone: {report['timezone']}"
     )
     lines.append(
@@ -142,7 +198,7 @@ def format_text(report):
     )
 
     lines.append(f"\n{'=' * 60}")
-    lines.append(f"  Overall statistics (last {days} days)")
+    lines.append(f"  Overall statistics ({rl})")
     lines.append(f"{'=' * 60}")
     lines.append(f"  Peak concurrent users (all hubs): {report['overall']['peak']}")
     for a in report["overall"]["above"]:
@@ -152,7 +208,7 @@ def format_text(report):
         )
 
     lines.append(f"\n{'=' * 60}")
-    lines.append(f"  Per-namespace peak concurrent users (last {days} days)")
+    lines.append(f"  Per-namespace peak concurrent users ({rl})")
     lines.append(f"{'=' * 60}")
     lines.append(f"  {'Namespace':<28} {'Peak':>5}  Chart")
     lines.append(f"  {'-' * 28} {'-' * 5}  -----")
@@ -173,9 +229,11 @@ def format_text(report):
     for w in report["weeks"]:
         bar = "#" * (w["peak"] // 5)
         lines.append(
-            f"  {w['week']:<12} {w['peak']:>5}  {w['active']:>6}  "
+            f"  {w['week']:<12} {w['peak']:>5}  {str(w['active']):>6}  "
             f"{w['hrs_t']:>6.1f}h  {w['hrs_t2']:>7.1f}h  {bar}"
         )
+    if report.get("active_note"):
+        lines.append(f"  * {report['active_note']}")
 
     pct_col = f"Pct>{T}"
     lines.append(f"\n{'=' * 60}")
@@ -208,16 +266,16 @@ def format_text(report):
 
 def format_markdown(report):
     """Render report data as Markdown."""
-    days = report["days"]
     T = report["threshold"]
     T2 = report["threshold2"]
+    rl = report["range_label"]
     lines = []
 
     lines.append("# JupyterHub Concurrent User Report")
     lines.append("")
     lines.append(f"**Generated:** {report['generated']}  ")
     lines.append(
-        f"**Range:** last {days} days  |  "
+        f"**Range:** {rl}  |  "
         f"**Thresholds:** {T}, {T2} users per node  |  "
         f"**Namespace:** {report['namespace_pattern']}  |  "
         f"**Timezone:** {report['timezone']}"
@@ -242,7 +300,7 @@ def format_markdown(report):
     lines.append("| Chart | Bar chart; each # = 5 users |")
     lines.append("")
 
-    lines.append(f"## Overall statistics (last {days} days)")
+    lines.append(f"## Overall statistics ({rl})")
     lines.append("")
     lines.append("| Metric | Value |")
     lines.append("|---|---|")
@@ -254,7 +312,7 @@ def format_markdown(report):
         )
     lines.append("")
 
-    lines.append(f"## Per-namespace peak concurrent users (last {days} days)")
+    lines.append(f"## Per-namespace peak concurrent users ({rl})")
     lines.append("")
     lines.append("| Namespace | Peak |")
     lines.append("|---|---|")
@@ -271,6 +329,8 @@ def format_markdown(report):
             f"| {w['week']} | {w['peak']} | {w['active']}"
             f" | {w['hrs_t']:.1f}h | {w['hrs_t2']:.1f}h |"
         )
+    if report.get("active_note"):
+        lines.append(f"\n*{report['active_note']}*")
     lines.append("")
 
     lines.append("## Concurrent users by hour of day (local time)")
@@ -297,9 +357,9 @@ def format_markdown(report):
 
 def format_html(report):
     """Render report data as a self-contained HTML document."""
-    days = report["days"]
     T = report["threshold"]
     T2 = report["threshold2"]
+    rl = report["range_label"]
 
     def th(*cells):
         return "<tr>" + "".join(f"<th>{c}</th>" for c in cells) + "</tr>"
@@ -331,7 +391,7 @@ def format_html(report):
 <h1>JupyterHub Concurrent User Report</h1>
 <p class="meta">
   Generated: {report["generated"]} &nbsp;|&nbsp;
-  Range: last {days} days &nbsp;|&nbsp;
+  Range: {rl} &nbsp;|&nbsp;
   Thresholds: {T}, {T2} users per node &nbsp;|&nbsp;
   Namespace: {report["namespace_pattern"]} &nbsp;|&nbsp;
   Timezone: {report["timezone"]}
@@ -351,7 +411,7 @@ def format_html(report):
         f"</table>"
     )
 
-    parts.append(f"<h2>Overall statistics (last {days} days)</h2><table>")
+    parts.append(f"<h2>Overall statistics ({rl})</h2><table>")
     parts.append(th("Metric", "Value"))
     parts.append(
         td("Peak concurrent users", f"<strong>{report['overall']['peak']}</strong>")
@@ -365,9 +425,7 @@ def format_html(report):
         )
     parts.append("</table>")
 
-    parts.append(
-        f"<h2>Per-namespace peak concurrent users (last {days} days)</h2><table>"
-    )
+    parts.append(f"<h2>Per-namespace peak concurrent users ({rl})</h2><table>")
     parts.append(th("Namespace", "Peak", "Chart"))
     for hub, val in report["hubs"]:
         bar = "#" * (val // 5)
@@ -387,6 +445,8 @@ def format_html(report):
             )
         )
     parts.append("</table>")
+    if report.get("active_note"):
+        parts.append(f"<p><em>{report['active_note']}</em></p>")
 
     parts.append("<h2>Concurrent users by hour of day (local time)</h2><table>")
     parts.append(th("Hour", "Peak", "Avg", f"% &gt; {T}"))
@@ -408,9 +468,15 @@ def format_html(report):
 
 def write_report(report, fmt, script_dir):
     """Write a formatted report to scripts/reports/."""
-    date_str = datetime.now().strftime("%Y-%m-%d")
     ext = {"text": "txt", "markdown": "md", "md": "md", "html": "html"}[fmt]
-    path = script_dir / "reports" / f"concurrent-users-{date_str}.{ext}"
+    if report.get("start") and report.get("end"):
+        start_slug = report["start"].replace(" ", "T").replace(":", "")
+        end_slug = report["end"].replace(" ", "T").replace(":", "")
+        filename = f"concurrent-users-{start_slug}-to-{end_slug}.{ext}"
+    else:
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        filename = f"concurrent-users-{date_str}.{ext}"
+    path = script_dir / "reports" / filename
 
     formatters = {
         "text": format_text,
@@ -423,13 +489,60 @@ def write_report(report, fmt, script_dir):
 
 
 def main(args):
-    window = f"{args.days}d"
-    subquery = f"[{window}:{args.step}]"
     ns_filter = f'namespace=~"{args.namespace_pattern}"'
     T = args.threshold
     T2 = int(T * 1.5)
+    tz = ZoneInfo(args.timezone)
 
-    print(f"Querying {args.url} over the last {args.days} days")
+    # Determine query window from either --start/--end or --days
+    if args.start:
+        start_dt = parse_local_dt(args.start, tz)
+        end_dt = parse_local_dt(args.end, tz)
+        if end_dt <= start_dt:
+            parser.error("--end must be after --start.")
+        range_label = f"from {args.start} to {args.end}"
+        query_time = int(end_dt.timestamp())
+    else:
+        end_dt = datetime.now(tz)
+        start_dt = end_dt - timedelta(days=args.days)
+        range_label = f"last {args.days} days"
+        query_time = None
+
+    duration = end_dt - start_dt
+    start_ts = int(start_dt.timestamp())
+    end_ts = int(end_dt.timestamp())
+    window = f"{int(duration.total_seconds())}s"
+
+    # Auto-scale range-query step to maximise detail within Prometheus point limits
+    if duration <= timedelta(days=7):
+        range_step = 300  # 5m  — deep-dive granularity
+    elif duration <= timedelta(days=30):
+        range_step = 900  # 15m — month snapshot
+    elif duration <= timedelta(days=90):
+        range_step = 1800  # 30m — default rolling view
+    else:
+        range_step = 3600  # 60m — semester-plus spans
+
+    step_label = {300: "5m", 900: "15m", 1800: "30m", 3600: "60m"}.get(
+        range_step, f"{range_step}s"
+    )
+
+    # WAU metric reflects a rolling 7-day window; suppress for shorter ranges
+    show_active = duration >= timedelta(days=7)
+
+    subquery = f"[{window}:{args.step}]"
+
+    if args.debug:
+        print("[debug] time window:")
+        print(f"  start:      {start_dt.strftime('%Y-%m-%d %H:%M %Z')}")
+        print(f"  end:        {end_dt.strftime('%Y-%m-%d %H:%M %Z')}")
+        print(f"  duration:   {duration}")
+        print(f"  range_step: {step_label}")
+        print(f"  subquery:   {subquery}")
+        if query_time is not None:
+            print(f"  query_time: {query_time}")
+
+    print(f"Querying {args.url} — {range_label}")
     print(
         f"Thresholds: {T}, {T2} users per node  |  "
         f"Namespace: {args.namespace_pattern}  |  Timezone: {args.timezone}"
@@ -446,14 +559,23 @@ def main(args):
     )
 
     report = {
-        "generated": datetime.now(ZoneInfo(args.timezone)).strftime(
-            "%Y-%m-%d %H:%M %Z"
-        ),
-        "days": args.days,
+        "generated": datetime.now(tz).strftime("%Y-%m-%d %H:%M %Z"),
+        "range_label": range_label,
+        "start": args.start,
+        "end": args.end,
         "threshold": T,
         "threshold2": T2,
         "timezone": args.timezone,
         "namespace_pattern": args.namespace_pattern,
+        "active_note": (
+            None
+            if show_active
+            else (
+                "Active column suppressed: query range is shorter than 7 days. "
+                "jupyterhub_active_users always reflects a rolling 7-day window "
+                "and would extend outside the requested range."
+            )
+        ),
         "overall": {"peak": None, "above": []},
         "hubs": [],
         "weeks": [],
@@ -464,28 +586,28 @@ def main(args):
     # -------------------------------------------------------------------------
     # Section 1: Overall peak + time-above-threshold
     # -------------------------------------------------------------------------
-    section(f"Overall statistics (last {args.days} days)")
+    section(f"Overall statistics ({range_label})")
 
+    promql = f"max_over_time(sum(jupyterhub_running_servers{{{ns_filter}}}){subquery})"
     if args.debug:
         print("  [debug] querying overall peak concurrent users")
-    data = query(
-        args.url,
-        f"max_over_time(sum(jupyterhub_running_servers{{{ns_filter}}}){subquery})",
-    )
+        print(f"  [debug]   {promql}")
+    data = prom_query(args.url, promql, time=query_time)
     peak = int(data["data"]["result"][0]["value"][1])
     print(f"  Peak concurrent users (all hubs): {peak}")
     report["overall"]["peak"] = peak
 
     for n in [T, T2]:
+        promql = (
+            f"sum_over_time((sum(jupyterhub_running_servers{{{ns_filter}}}) > bool {n}){subquery})"
+            f" / count_over_time(sum(jupyterhub_running_servers{{{ns_filter}}}){subquery})"
+        )
         if args.debug:
             print(f"  [debug] querying % of time above {n} users")
-        data = query(
-            args.url,
-            f"sum_over_time((sum(jupyterhub_running_servers{{{ns_filter}}}) > bool {n}){subquery})"
-            f" / count_over_time(sum(jupyterhub_running_servers{{{ns_filter}}}){subquery})",
-        )
+            print(f"  [debug]   {promql}")
+        data = prom_query(args.url, promql, time=query_time)
         frac = float(data["data"]["result"][0]["value"][1])
-        hours_above = frac * args.days * 24
+        hours_above = frac * duration.total_seconds() / 3600
         print(
             f"  % of time above {n:>3} users per node: "
             f"{frac * 100:5.2f}%  (~{hours_above:.1f} hours total)"
@@ -497,13 +619,13 @@ def main(args):
     # -------------------------------------------------------------------------
     # Section 2: Per-hub peak
     # -------------------------------------------------------------------------
-    section(f"Per-namespace peak concurrent users (last {args.days} days)")
+    section(f"Per-namespace peak concurrent users ({range_label})")
 
+    promql = f"max_over_time(jupyterhub_running_servers{{{ns_filter}}}{subquery})"
     if args.debug:
         print("  [debug] querying per-namespace peak concurrent users")
-    data = query(
-        args.url, f"max_over_time(jupyterhub_running_servers{{{ns_filter}}}{subquery})"
-    )
+        print(f"  [debug]   {promql}")
+    data = prom_query(args.url, promql, time=query_time)
     hubs = {}
     for r in data["data"]["result"]:
         ns = r["metric"].get("namespace", "unknown")
@@ -524,9 +646,17 @@ def main(args):
     # Fetch range data once for the remaining analyses (30m resolution)
     # -------------------------------------------------------------------------
     if args.debug:
-        print(f"\n  [debug] fetching {args.days}d of range samples at 30m resolution")
+        print(
+            f"\n  [debug] fetching range samples at {step_label} resolution ({range_label})"
+        )
     samples = get_range_samples(
-        args.url, args.days, args.timezone, args.namespace_pattern
+        args.url,
+        start_ts,
+        end_ts,
+        args.timezone,
+        args.namespace_pattern,
+        step=range_step,
+        debug=args.debug,
     )
     if args.debug:
         print(f"  [debug] got {len(samples)} samples")
@@ -536,28 +666,25 @@ def main(args):
     # -------------------------------------------------------------------------
     section("Week-by-week breakdown (Mon–Sun, local time)")
 
-    # Fetch weekly active users: last sample per week gives WAU for that week
-    if args.debug:
-        print(
-            "  [debug] fetching weekly active users (jupyterhub_active_users{period='7d'})"
-        )
-    _end_ts = int(time.time())
-    _start_ts = _end_ts - args.days * 86400
-    _tz = ZoneInfo(args.timezone)
-    _au_vals = query_range(
-        args.url,
-        f'sum(max(jupyterhub_active_users{{period="7d", {ns_filter}}}) by (namespace))',
-        _start_ts,
-        _end_ts,
-        step=1800,
-    )
+    # Fetch weekly active users: last sample per week gives WAU for that week.
+    # Suppressed for ranges < 7 days since the metric always reflects a 7-day window.
     week_active_users = {}
-    for _ts, _val in _au_vals:
-        _dt = datetime.fromtimestamp(int(_ts), tz=_tz)
-        _wk = (_dt - timedelta(days=_dt.weekday())).strftime("%Y-%m-%d")
-        week_active_users[_wk] = int(float(_val))
-    if args.debug:
-        print(f"  [debug] got WAU data for {len(week_active_users)} weeks")
+    if show_active:
+        wau_promql = f'sum(max(jupyterhub_active_users{{period="7d", {ns_filter}}}) by (namespace))'
+        if args.debug:
+            print(
+                "  [debug] fetching weekly active users (jupyterhub_active_users{period='7d'})"
+            )
+            print(f"  [debug]   {wau_promql}")
+        _au_vals = query_range(args.url, wau_promql, start_ts, end_ts, step=1800)
+        for _ts, _val in _au_vals:
+            _dt = datetime.fromtimestamp(int(_ts), tz=tz)
+            _wk = (_dt - timedelta(days=_dt.weekday())).strftime("%Y-%m-%d")
+            week_active_users[_wk] = int(float(_val))
+        if args.debug:
+            print(f"  [debug] got WAU data for {len(week_active_users)} weeks")
+    elif args.debug:
+        print("  [debug] skipping WAU query: range shorter than 7 days")
 
     week_samples = defaultdict(list)
     for dt, v in samples:
@@ -571,16 +698,16 @@ def main(args):
         f"{hrs_t_col:>7}  {hrs_t2_col:>8}  Chart"
     )
     print(f"  {'-' * 12} {'-' * 5}  {'-' * 6}  {'-' * 7}  {'-' * 8}  -----")
+    sample_hours = range_step / 3600
     for week in sorted(week_samples):
         s = week_samples[week]
         wpeak = max(s)
-        active = week_active_users.get(week, 0)
-        # each sample = 30 min
-        hrs_t = sum(1 for v in s if v > T) * 0.5
-        hrs_t2 = sum(1 for v in s if v > T2) * 0.5
+        active = week_active_users.get(week, "--") if show_active else "--"
+        hrs_t = sum(1 for v in s if v > T) * sample_hours
+        hrs_t2 = sum(1 for v in s if v > T2) * sample_hours
         bar = "#" * (wpeak // 5)
         print(
-            f"  {week:<12} {wpeak:>5}  {active:>6}  "
+            f"  {week:<12} {wpeak:>5}  {str(active):>6}  "
             f"{hrs_t:>6.1f}h  {hrs_t2:>7.1f}h  {bar}"
         )
         report["weeks"].append(
@@ -592,6 +719,8 @@ def main(args):
                 "hrs_t2": hrs_t2,
             }
         )
+    if report.get("active_note"):
+        print(f"  * {report['active_note']}")
 
     # -------------------------------------------------------------------------
     # Section 4: Hour-of-day breakdown
@@ -668,7 +797,23 @@ if __name__ == "__main__":
         "-c", "--config", metavar="FILE", help="Path to a YAML config file"
     )
     parser.add_argument(
-        "-d", "--days", type=int, default=90, help="Days to look back (default: 90)"
+        "-d",
+        "--days",
+        type=int,
+        default=None,
+        help="Days to look back (default: 90). Mutually exclusive with --start/--end.",
+    )
+    parser.add_argument(
+        "--start",
+        metavar="DATETIME",
+        help='Start of query window in local timezone, e.g. "2026-03-01" or "2026-03-01 08:00". '
+        "Requires --end. Mutually exclusive with --days.",
+    )
+    parser.add_argument(
+        "--end",
+        metavar="DATETIME",
+        help='End of query window in local timezone, e.g. "2026-04-15" or "2026-04-15 18:00". '
+        "Requires --start. Mutually exclusive with --days.",
     )
     parser.add_argument(
         "--step",
@@ -716,5 +861,19 @@ if __name__ == "__main__":
         parser.set_defaults(**config_defaults)
 
     args = parser.parse_args()
+
+    using_range = bool(args.start or args.end)
+    using_days = args.days is not None
+    if using_range and using_days:
+        parser.error("--start/--end and --days are mutually exclusive.")
+    if bool(args.start) != bool(args.end):
+        parser.error("--start and --end must both be provided together.")
+    if not using_days and not using_range:
+        args.days = 90
+
+    if args.debug:
+        print("[debug] resolved args:")
+        for k, v in sorted(vars(args).items()):
+            print(f"  {k}: {v!r}")
 
     main(args)
