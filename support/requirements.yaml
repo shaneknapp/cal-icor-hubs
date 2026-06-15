@@ -1,6 +1,6 @@
 dependencies:
   - name: node-placeholder-scaler
-    version: 0.0.1-0.dev.git.419.h34ae431
+    version: 0.0.1-0.dev.git.421.h1c9a031
     repository: oci://us-central1-docker.pkg.dev/cal-icor-hubs/helm-charts
   - name: prometheus-statsd-exporter
     version: 0.11.0
