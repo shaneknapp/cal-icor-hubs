@@ -33,3 +33,21 @@ variable "nat_egress_ip_name" {
   default     = "spring-2025-nat-egress"
   description = "Name of the reserved static egress IP used by Cloud NAT (outbound only)."
 }
+
+variable "iap_ssh_firewall_name" {
+  type        = string
+  default     = "spring-2025-allow-iap-ssh"
+  description = "Name of the firewall rule allowing IAP-tunneled SSH to cluster nodes."
+}
+
+variable "iap_source_range" {
+  type        = string
+  default     = "35.235.240.0/20"
+  description = "Google IAP TCP forwarding source range, for SSH to private nodes via --tunnel-through-iap."
+}
+
+variable "node_tag" {
+  type        = string
+  default     = "hub-cluster"
+  description = "Network tag carried by every node pool in the spring-2025 cluster; firewall target for IAP SSH."
+}

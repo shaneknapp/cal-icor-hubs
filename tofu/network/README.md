@@ -18,6 +18,21 @@ adoption). The cluster and node pools remain out-of-band for now.
 - Additive only: nodes are still public until later phases. Creating NAT now is
   safe and changes nothing about existing traffic.
 
+## IAP SSH firewall rule
+
+`firewall.tf` adds `spring-2025-allow-iap-ssh`: an INGRESS rule permitting
+Google's IAP TCP forwarding range (`35.235.240.0/20`) to reach tcp:22 on cluster
+nodes (target tag `hub-cluster`).
+
+This is **additive and changes nothing while nodes are public** — direct
+`gcloud compute ssh` over a node's external IP keeps working via the existing
+broad `allow-ssh` rule. The IAP rule matters once a pool goes private: a private
+node has no external IP, so SSH must tunnel through IAP
+(`gcloud compute ssh <node> --zone=us-central1-b --tunnel-through-iap`, plus
+`roles/iap.tunnelResourceAccessor`). Scoping the rule to the IAP range and the
+node tag also lets the broad `allow-ssh` rule be narrowed or removed later in the
+access lock-down without losing operator SSH.
+
 ## NAT egress IP
 
 `MANUAL_ONLY` pinned to the reserved static IP `spring-2025-nat-egress`, so the
