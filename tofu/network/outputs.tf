@@ -12,3 +12,8 @@ output "nat_name" {
   value       = google_compute_router_nat.nat.name
   description = "Cloud NAT gateway name."
 }
+
+output "iap_ssh_firewall_name" {
+  value       = google_compute_firewall.iap_ssh.name
+  description = "Firewall rule allowing IAP-tunneled SSH (tcp:22 from 35.235.240.0/20) to cluster nodes once they go private."
+}
