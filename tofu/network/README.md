@@ -72,3 +72,54 @@ Nothing depends on the NAT yet (nodes are still public), so removal is clean:
 ```sh
 tofu destroy   # removes NAT, router, and the egress IP
 ```
+
+<!-- BEGIN_TF_DOCS -->
+## Requirements
+
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7 |
+| <a name="requirement_google"></a> [google](#requirement\_google) | ~> 6.0 |
+
+## Providers
+
+| Name | Version |
+| ---- | ------- |
+| <a name="provider_google"></a> [google](#provider\_google) | 6.50.0 |
+
+## Modules
+
+No modules.
+
+## Resources
+
+| Name | Type |
+| ---- | ---- |
+| [google_compute_address.nat_egress](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_address) | resource |
+| [google_compute_firewall.iap_ssh](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_firewall) | resource |
+| [google_compute_router.nat_router](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_router) | resource |
+| [google_compute_router_nat.nat](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_router_nat) | resource |
+
+## Inputs
+
+| Name | Description | Type | Default | Required |
+| ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_iap_source_range"></a> [iap\_source\_range](#input\_iap\_source\_range) | Google IAP TCP forwarding source range, for SSH to private nodes via --tunnel-through-iap. | `string` | `"35.235.240.0/20"` | no |
+| <a name="input_iap_ssh_firewall_name"></a> [iap\_ssh\_firewall\_name](#input\_iap\_ssh\_firewall\_name) | Name of the firewall rule allowing IAP-tunneled SSH to cluster nodes. | `string` | `"spring-2025-allow-iap-ssh"` | no |
+| <a name="input_nat_egress_ip_name"></a> [nat\_egress\_ip\_name](#input\_nat\_egress\_ip\_name) | Name of the reserved static egress IP used by Cloud NAT (outbound only). | `string` | `"spring-2025-nat-egress"` | no |
+| <a name="input_nat_name"></a> [nat\_name](#input\_nat\_name) | Name of the Cloud NAT gateway. | `string` | `"spring-2025-nat"` | no |
+| <a name="input_network"></a> [network](#input\_network) | VPC network the spring-2025 cluster runs on. | `string` | `"default"` | no |
+| <a name="input_node_tag"></a> [node\_tag](#input\_node\_tag) | Network tag carried by every node pool in the spring-2025 cluster; firewall target for IAP SSH. | `string` | `"hub-cluster"` | no |
+| <a name="input_project"></a> [project](#input\_project) | GCP project hosting the spring-2025 cluster. | `string` | `"cal-icor-hubs"` | no |
+| <a name="input_region"></a> [region](#input\_region) | Region for the Cloud Router, Cloud NAT, and egress IP. | `string` | `"us-central1"` | no |
+| <a name="input_router_name"></a> [router\_name](#input\_router\_name) | Name of the Cloud Router that hosts the NAT config. | `string` | `"spring-2025-nat-router"` | no |
+
+## Outputs
+
+| Name | Description |
+| ---- | ----------- |
+| <a name="output_iap_ssh_firewall_name"></a> [iap\_ssh\_firewall\_name](#output\_iap\_ssh\_firewall\_name) | Firewall rule allowing IAP-tunneled SSH (tcp:22 from 35.235.240.0/20) to cluster nodes once they go private. |
+| <a name="output_nat_egress_ip"></a> [nat\_egress\_ip](#output\_nat\_egress\_ip) | Stable outbound egress IP for all private-node traffic to the public internet. Document/allowlist this where needed. Distinct from the inbound ingress IP 34.56.76.244. |
+| <a name="output_nat_name"></a> [nat\_name](#output\_nat\_name) | Cloud NAT gateway name. |
+| <a name="output_router_name"></a> [router\_name](#output\_router\_name) | Cloud Router hosting the NAT config. |
+<!-- END_TF_DOCS -->
