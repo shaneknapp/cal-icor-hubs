@@ -100,6 +100,13 @@ tofu-nodepools:
   - 'tofu/modules/nodepools/**'
   - 'tofu/spring-2025/*pool*/**'
 
+# per-pool labels (filter migration-phase PRs by which pool they touch)
+tofu-prometheus-pool:
+  - 'tofu/spring-2025/prometheus-pool/**'
+
+tofu-core-pool:
+  - 'tofu/spring-2025/core-pool/**'
+
 # add hub-specific labels for deployment changes
 'hub: dvc':
   - 'deployments/dvc/**'
