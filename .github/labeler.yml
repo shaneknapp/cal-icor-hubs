@@ -77,9 +77,28 @@ jupyterhub-deployment:
 tofu:
   - 'tofu/**'
 
-# tofu networking
+# terragrunt orchestration / wiring (root config + per-unit terragrunt.hcl)
+terragrunt:
+  - 'tofu/*.hcl'
+  - 'tofu/**/*.hcl'
+
+# reusable tofu modules
+tofu-modules:
+  - 'tofu/modules/**'
+
+# live units for the spring-2025 cluster
+tofu-spring-2025:
+  - 'tofu/spring-2025/**'
+
+# tofu networking (Cloud Router / NAT / egress IP / firewall)
 tofu-network:
-  - 'tofu/network/**'
+  - 'tofu/modules/network/**'
+  - 'tofu/spring-2025/network/**'
+
+# tofu node pools
+tofu-nodepools:
+  - 'tofu/modules/nodepools/**'
+  - 'tofu/spring-2025/*pool*/**'
 
 # add hub-specific labels for deployment changes
 'hub: dvc':
