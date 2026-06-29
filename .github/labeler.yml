@@ -78,8 +78,8 @@ tofu:
   - 'tofu/**'
 
 # tofu networking
-tofu-networking:
-  - 'tofu/networking/**'
+tofu-network:
+  - 'tofu/network/**'
 
 # add hub-specific labels for deployment changes
 'hub: dvc':
