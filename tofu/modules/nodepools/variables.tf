@@ -135,3 +135,29 @@ variable "insecure_kubelet_readonly_port_enabled" {
     error_message = "Must be the string \"TRUE\" or \"FALSE\"."
   }
 }
+
+variable "cpu_manager_policy" {
+  # Null (the default) omits the field, leaving the GKE default of "none" — that
+  # matches prometheus-pool. The core pool was created with "static", so its
+  # replacement unit sets it explicitly to preserve 1:1 parity. The setting is
+  # immutable on a live pool, so it must be chosen at creation; today it is a
+  # no-op on core (no Guaranteed-QoS integer-CPU pods land there) but is kept to
+  # avoid any behavioral change during the migration.
+  type        = string
+  default     = null
+  description = "kubelet CPU manager policy: \"static\" pins whole cores to Guaranteed-QoS integer-CPU pods; null/\"none\" shares all cores. Set \"static\" for the core pool to match the pool it replaces."
+
+  validation {
+    condition     = var.cpu_manager_policy == null ? true : contains(["static", "none"], var.cpu_manager_policy)
+    error_message = "Must be null, \"static\", or \"none\"."
+  }
+}
+
+variable "linux_node_sysctls" {
+  # An empty map (the default) omits linux_node_config entirely, leaving GKE
+  # node defaults — that matches prometheus-pool. The core pool carries the DH-3
+  # TCP/IP stack tuning (net.core.* / net.ipv4.tcp_*), set inline in its unit.
+  type        = map(string)
+  default     = {}
+  description = "Kernel sysctls applied to the nodes via linux_node_config. Empty omits the block; the core pool passes its TCP/IP tuning values."
+}

@@ -78,6 +78,18 @@ resource "google_container_node_pool" "pool" {
 
     kubelet_config {
       insecure_kubelet_readonly_port_enabled = var.insecure_kubelet_readonly_port_enabled
+      # Omitted when null (prometheus); "static" on the core pool for parity.
+      cpu_manager_policy = var.cpu_manager_policy
+    }
+
+    # Kernel sysctl tuning. Emitted only when sysctls are passed (the core pool's
+    # DH-3 TCP/IP tuning); omitted for pools that pass none, so they keep GKE
+    # node defaults and stay a no-op.
+    dynamic "linux_node_config" {
+      for_each = length(var.linux_node_sysctls) > 0 ? [1] : []
+      content {
+        sysctls = var.linux_node_sysctls
+      }
     }
 
     dynamic "taint" {
