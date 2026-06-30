@@ -1,11 +1,12 @@
 # OpenTofu + Terragrunt
 
-Infrastructure for the `spring-2025` GKE cluster, managed with OpenTofu and
-orchestrated by [Terragrunt](https://terragrunt.gruntwork.io/).
+Infrastructure for the `spring-2025` GKE cluster, managed with
+[OpenTofu](https://opentofu.org/) and orchestrated by
+[Terragrunt](https://terragrunt.gruntwork.io/).
 
 ## Layout
 
-```
+```bash
 tofu/
   root.hcl                       # shared remote-state (GCS) + common inputs (project, region)
   modules/                       # reusable OpenTofu code (no backend/provider state)
