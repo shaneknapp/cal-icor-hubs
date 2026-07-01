@@ -64,14 +64,14 @@ jupyterhub:
           c.QtPDFExporter.enabled = False
           c.QtPNGExporter.enabled = False
           c.WebPDFExporter.enabled = False
-      opencode:
-        # don't use highest-priority 'managed' path: /etc/opencode/opencode.json
-        mountPath: /etc/opencode-default/opencode.json
-        data:
-          $schema: "https://opencode.ai/config.json"
-          model: nrp/qwen3
-          disabled_providers:
-            - opencode
+      # opencode:
+      #   # don't use highest-priority 'managed' path: /etc/opencode/opencode.json
+      #   mountPath: /etc/opencode-default/opencode.json
+      #   data:
+      #     $schema: "https://opencode.ai/config.json"
+      #     model: nrp/qwen3
+      #     disabled_providers:
+      #       - opencode
           # provider:
           #   nrp:
           #     npm: "@ai-sdk/openai-compatible"
