@@ -47,6 +47,6 @@ body:
   - type: textarea
     id: additional-info
     attributes:
-      label: "Any additional information we should know about?"
+      label: "Please let us know how much storage you need, a reason and any other relevant details."
     validations:
       required: false
