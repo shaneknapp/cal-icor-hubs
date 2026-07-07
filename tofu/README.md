@@ -18,6 +18,7 @@ tofu/
     core-pool/terragrunt.hcl        # -> spring-2025/core-pool
     support-pool/terragrunt.hcl     # -> spring-2025/support-pool
     user-pool/terragrunt.hcl        # -> spring-2025/user-pool
+    workshop-pool/terragrunt.hcl    # -> spring-2025/workshop-pool
 ```
 
 Each leaf `terragrunt.hcl` is a *unit*: it `include`s `root.hcl` and points at a
@@ -57,6 +58,8 @@ current as each phase lands.
 | 4 | `spring-2025/user-pool` (`modules/nodepools`) | Private `user-pool-2026-07-07` for the student singleuser notebook servers (the only pool with a taint, `hub.jupyter.org_dedicated=user:NO_SCHEDULE`) plus the placeholder-scaler's warm spares. `n2-highmem-8`, disk 200 GB, autoscale `min 0 / max 3`, `location_policy = ANY` (all mirroring the live `user-base`). **Graceful cutover, no window**: draining would kill live sessions, so the old pool is not drained. The singleuser + placeholder nodeSelectors are repointed to the new pool (`base-pool` -> `user-pool-2026-07-07`), new spawns land private, and the old `user-base` pool is cordoned and left to empty via the culler (idle 30m / maxAge 12h) before deletion. | Complete (2026-07-07: pool applied, all 22 hubs' singleuser + placeholder nodeSelectors cut over via #860, new spawns verified private on staging + prod, old public `user-base` cordoned then deleted once its last session logged out). This was the final phase: every pool on the cluster now runs private nodes with Cloud NAT egress. |
 
 The `gpu-pool` is excluded from the migration (idle / scaled to zero).
+
+`spring-2025/workshop-pool` (`workshop-pool-2026-07-07`) is a post-migration addition, not a phase: a second private user pool dedicated to workshops, normally scaled to zero. See `spring-2025/README.md`.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
