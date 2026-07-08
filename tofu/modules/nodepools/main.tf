@@ -1,3 +1,4 @@
+# CI smoke test (test-tofu-ci): no-op to trigger a plan; revert before merge.
 # Reusable module for rebuilding a spring-2025 node pool as a PRIVATE pool (nodes
 # get internal IPs only; egress flows through the Cloud NAT in modules/network).
 #

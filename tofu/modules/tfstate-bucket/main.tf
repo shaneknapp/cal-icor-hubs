@@ -1,3 +1,4 @@
+# CI smoke test (test-tofu-ci): no-op to trigger a plan; revert before merge.
 # The GCS bucket holding every unit's remote state, including its own.
 # Adopted via import, never created.
 resource "google_storage_bucket" "state" {
