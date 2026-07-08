@@ -45,11 +45,11 @@ terragrunt apply        # mutates real infra; review the plan first
 
 ## CI
 
-`.github/workflows/tofu-ci.yaml` runs on PRs touching `tofu/`: it runs pre-commit
-on the changed files and `terragrunt plan` on the affected units, posting the plan
-back as a PR comment. The plan job authenticates with direct Workload Identity
-Federation, so there is no service account and no stored key. GitHub's OIDC token
-is exchanged for read-only `roles/viewer` on the project.
+`.github/workflows/tofu-ci.yaml` runs on PRs that touch `tofu/`. Right now it has
+one job: run pre-commit on the changed files.
+
+`plan` and `apply` will be done in a new workflow, and the identity will be
+re-scoped.
 
 One-time GCP setup (run once, needs an IAM admin):
 
