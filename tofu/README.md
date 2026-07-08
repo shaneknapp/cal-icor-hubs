@@ -12,6 +12,9 @@ tofu/
   modules/                       # reusable OpenTofu code (no backend/provider state)
     network/                     # Cloud Router, NAT, egress IP, IAP-SSH firewall
     nodepools/                   # reusable private GKE node-pool module
+    tfstate-bucket/              # the GCS remote-state bucket itself (imported)
+  bootstrap/                     # global units, not tied to one cluster
+    tfstate-bucket/terragrunt.hcl   # -> bootstrap/tfstate-bucket
   spring-2025/                   # live units; one state file each, key derived from path
     network/terragrunt.hcl          # -> state prefix spring-2025/network
     prometheus-pool/terragrunt.hcl  # -> spring-2025/prometheus-pool
@@ -32,13 +35,47 @@ Terragrunt drives OpenTofu, so set it to use `tofu` rather than `terraform`:
 
 ```bash
 export TG_TF_PATH=tofu
-cd tofu/spring-2025/network
+cd tofu/spring-2025/<unit>
 terragrunt init
 terragrunt plan
 terragrunt apply        # mutates real infra; review the plan first
 ```
 
 `terragrunt` must be on `PATH` (also required by the pre-commit hooks).
+
+## CI
+
+`.github/workflows/tofu-ci.yaml` runs on PRs touching `tofu/`: it runs pre-commit
+on the changed files and `terragrunt plan` on the affected units, posting the plan
+back as a PR comment. The plan job authenticates with direct Workload Identity
+Federation, so there is no service account and no stored key. GitHub's OIDC token
+is exchanged for read-only `roles/viewer` on the project.
+
+One-time GCP setup (run once, needs an IAM admin):
+
+```bash
+gcloud services enable sts.googleapis.com iamcredentials.googleapis.com --project=cal-icor-hubs
+
+gcloud iam workload-identity-pools create github \
+  --project=cal-icor-hubs --location=global --display-name="GitHub Actions"
+
+gcloud iam workload-identity-pools providers create-oidc github \
+  --project=cal-icor-hubs --location=global --workload-identity-pool=github \
+  --display-name="GitHub OIDC" \
+  --issuer-uri="https://token.actions.githubusercontent.com" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner" \
+  --attribute-condition="assertion.repository_owner == 'cal-icor'"
+
+# Read-only, scoped to this repo's federated identity.
+gcloud projects add-iam-policy-binding cal-icor-hubs \
+  --role="roles/viewer" \
+  --member="principalSet://iam.googleapis.com/projects/1045396016572/locations/global/workloadIdentityPools/github/attribute.repository/cal-icor/cal-icor-hubs"
+```
+
+The `attribute-condition` locks the pool to the `cal-icor` org and the
+`principalSet` binding to this one repo, so no other repo can use it. The provider
+resource name in the workflow is
+`projects/1045396016572/locations/global/workloadIdentityPools/github/providers/github`.
 
 ## Private node migration
 
@@ -60,6 +97,18 @@ current as each phase lands.
 The `gpu-pool` is excluded from the migration (idle / scaled to zero).
 
 `spring-2025/workshop-pool` (`workshop-pool-2026-07-07`) is a post-migration addition, not a phase: a second private user pool dedicated to workshops, normally scaled to zero. See `spring-2025/README.md`.
+
+## State bucket
+
+`bootstrap/tfstate-bucket` manages the GCS bucket that holds every unit's state,
+including its own. The bucket was created by hand before the tofu conversion, so
+the unit adopts it with `terragrunt import` rather than creating it, and a clean
+`plan` afterward is the sign the config matches. `prevent_destroy` and
+`force_destroy = false` in `modules/tfstate-bucket` keep a stray `destroy` from
+deleting the bucket that all the other state lives in. It also pins the settings
+that were only clicked once at creation: uniform bucket-level access, public
+access prevention set to `enforced`, object versioning, a 7-day soft-delete
+window, and the `hub = networking` billing label.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
