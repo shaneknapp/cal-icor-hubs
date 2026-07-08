@@ -10,11 +10,13 @@ Infrastructure for the `spring-2025` GKE cluster, managed with
 tofu/
   root.hcl                       # shared remote-state (GCS) + common inputs (project, region)
   modules/                       # reusable OpenTofu code (no backend/provider state)
+    cluster/                     # reusable GKE cluster (pools are separate units)
     network/                     # Cloud Router, NAT, egress IP, IAP-SSH firewall
     nodepools/                   # reusable private GKE node-pool module
     tfstate-bucket/              # the GCS remote-state bucket itself (imported)
   bootstrap/                     # global units, not tied to one cluster
     tfstate-bucket/terragrunt.hcl   # -> bootstrap/tfstate-bucket
+  cluster-template/              # copy to tofu/<cluster-name>/ to stand up a new cluster
   spring-2025/                   # live units; one state file each, key derived from path
     network/terragrunt.hcl          # -> state prefix spring-2025/network
     prometheus-pool/terragrunt.hcl  # -> spring-2025/prometheus-pool
