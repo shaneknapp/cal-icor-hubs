@@ -43,19 +43,20 @@ jobs:
           chmod +x /usr/local/bin/terragrunt
           terragrunt --version
 
-      - name: Install pre-commit
-        run: pip install pre-commit==4.4.0
-
-      - name: Run pre-commit on changed tofu files
+      - name: List changed tofu files
+        id: changed
         run: |
           base="${{ github.event.pull_request.base.sha }}"
-          mapfile -t files < <(git diff --name-only "$base" HEAD -- tofu/)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No tofu files changed."
-            exit 0
-          fi
-          printf 'Changed tofu files:\n%s\n' "${files[*]}"
-          pre-commit run --files "${files[@]}"
+          head="${{ github.event.pull_request.head.sha }}"
+          files="$(git diff --name-only "$base" "$head" -- tofu/ | tr '\n' ' ')"
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+          echo "Changed tofu files: $files"
+
+      - name: Run pre-commit
+        if: steps.changed.outputs.files != ''
+        uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --files ${{ steps.changed.outputs.files }}
 
   plan:
     runs-on: ubuntu-latest
