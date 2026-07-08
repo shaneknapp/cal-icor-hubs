@@ -23,3 +23,8 @@ The same config serves two cases:
 Add other units alongside `cluster/` as needed: a `network/` unit
 (`modules/network`) for the Cloud NAT, then one node-pool unit per pool
 (`modules/nodepools`).
+
+One subnet per cluster, not one per pool: all node pools share the cluster's
+single pod secondary range. If two clusters ever share the VPC, give each its
+own subnet with non-colliding ranges (the dev and redeploy cases above already
+do).
