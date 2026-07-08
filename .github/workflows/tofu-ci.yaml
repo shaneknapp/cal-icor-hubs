@@ -1,0 +1,216 @@
+# CI for tofu/. On PRs touching tofu/: run pre-commit on changed files, and
+# terragrunt plan the affected units, posting the result as a PR comment.
+# Auth is direct Workload Identity Federation (no service account, no key);
+# see tofu/README.md ("CI") for the one-time GCP setup.
+name: "tofu CI"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "tofu/**"
+
+env:
+  TOFU_VERSION: "1.12.3"
+  TERRAGRUNT_VERSION: "1.1.0"
+  TG_TF_PATH: tofu
+  TG_NON_INTERACTIVE: "true"
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # need the base commit to diff
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false  # hooks call `tofu` directly
+
+      - name: Install Terragrunt
+        run: |
+          curl -sSL -o /usr/local/bin/terragrunt \
+            "https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}/terragrunt_linux_amd64"
+          chmod +x /usr/local/bin/terragrunt
+          terragrunt --version
+
+      - name: List changed tofu files
+        id: changed
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          files="$(git diff --name-only "$base" "$head" -- tofu/ | tr '\n' ' ')"
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+          echo "Changed tofu files: $files"
+
+      - name: Run pre-commit
+        if: steps.changed.outputs.files != ''
+        uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --files ${{ steps.changed.outputs.files }}
+
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write  # mint the OIDC token for WIF
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+
+      - name: Install Terragrunt
+        run: |
+          curl -sSL -o /usr/local/bin/terragrunt \
+            "https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}/terragrunt_linux_amd64"
+          chmod +x /usr/local/bin/terragrunt
+          terragrunt --version
+
+      # Direct WIF: writes ADC that the google provider + gcs backend pick up.
+      - name: Auth to GCP
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: cal-icor-hubs
+          workload_identity_provider: "projects/1045396016572/locations/global/workloadIdentityPools/github/providers/github"
+
+      - name: Determine affected units
+        id: affected
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          mapfile -t changed < <(git diff --name-only "$base" HEAD -- tofu/)
+          mapfile -t all_units < <(
+            find tofu -name terragrunt.hcl -not -path '*/.terragrunt-cache/*' -printf '%h\n' | sort -u
+          )
+
+          declare -A affected
+          for f in "${changed[@]}"; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              tofu/root.hcl)  # shared config: every unit
+                for u in "${all_units[@]}"; do affected["$u"]=1; done
+                ;;
+              tofu/modules/*)  # module: every unit sourcing it
+                mod=$(printf '%s\n' "$f" | cut -d/ -f3)
+                for u in "${all_units[@]}"; do
+                  if grep -q "modules/${mod}\b" "$u/terragrunt.hcl"; then
+                    affected["$u"]=1
+                  fi
+                done
+                ;;
+              *)  # file inside a unit: that unit
+                for u in "${all_units[@]}"; do
+                  case "$f" in
+                    "$u"/*) affected["$u"]=1 ;;
+                  esac
+                done
+                ;;
+            esac
+          done
+
+          units="$(printf '%s\n' "${!affected[@]}" | sort)"
+          {
+            echo "units<<EOF"
+            echo "$units"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "Affected units:"
+          echo "$units"
+
+      - name: Run terragrunt plan
+        id: plan
+        run: |
+          marker='<!-- tofu-plan -->'
+          out=plan-comment.md
+          {
+            echo "$marker"
+            echo "## tofu plan"
+            echo
+          } > "$out"
+
+          units="${{ steps.affected.outputs.units }}"
+          if [ -z "$units" ]; then
+            echo "No units affected (docs-only or non-unit change)." >> "$out"
+            echo "status=ok" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          overall=ok
+          while IFS= read -r unit; do
+            [ -z "$unit" ] && continue
+            echo "::group::plan $unit"
+            log=$(mktemp)
+            (
+              cd "$unit"
+              terragrunt init -input=false >/dev/null 2>&1 &&
+              terragrunt plan -input=false -lock=false -no-color
+            ) >"$log" 2>&1
+            rc=$?
+            cat "$log"
+            echo "::endgroup::"
+
+            body=$(tail -c 20000 "$log")  # stay under the 65k comment limit
+            if [ "$rc" -eq 0 ]; then
+              summary="plan ok"
+            else
+              summary="plan FAILED (exit $rc)"
+              overall=fail
+            fi
+            {
+              echo "<details><summary><code>$unit</code>: $summary</summary>"
+              echo
+              echo '```'
+              echo "$body"
+              echo '```'
+              echo "</details>"
+              echo
+            } >> "$out"
+          done <<< "$units"
+
+          echo "status=$overall" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert PR comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- tofu-plan -->';
+            let body;
+            try {
+              body = fs.readFileSync('plan-comment.md', 'utf8');
+            } catch (e) {
+              body = `${marker}\n## tofu plan\n\nThe plan step produced no output; check the workflow logs.`;
+            }
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner, repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Fail if any plan errored
+        if: steps.plan.outputs.status == 'fail'
+        run: |
+          echo "One or more units failed to plan; see the PR comment."
+          exit 1
