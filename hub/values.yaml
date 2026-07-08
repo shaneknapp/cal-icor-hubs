@@ -313,14 +313,6 @@ jupyterhub:
         # use the main hub for auth
           - access:services
           - self
-      # Creat the cloudbank-pilot-hub-users service used by the cloudbank-pilot-hub 
-      # repo to monitor user counts
-      cloudbank-pilot-hub-users:
-        services:
-          - cloudbank-pilot-hub-users
-        scopes:
-          - list:users
-          - read:users
 
     config:
       Pagination:
