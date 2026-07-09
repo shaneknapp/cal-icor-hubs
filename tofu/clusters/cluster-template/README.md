@@ -18,11 +18,11 @@ The units:
 
 ```bash
 export TG_TF_PATH=tofu
-cp -r tofu/cluster-template tofu/<cluster-name>
-# edit tofu/<cluster-name>/cluster/terragrunt.hcl: set cluster_name, then uncomment
+cp -r tofu/clusters/cluster-template tofu/clusters/<cluster-name>
+# edit tofu/clusters/<cluster-name>/cluster/terragrunt.hcl: set cluster_name, then uncomment
 #   ONE of the two case blocks (dev or redeploy) described below
 # edit the pool units: date-stamp pool_name, adjust machine_type for dev
-cd tofu/<cluster-name>
+cd tofu/clusters/<cluster-name>
 terragrunt run-all plan      # cluster, then network, then the pools
 terragrunt run-all apply     # mutates real infra; review the plan first
 ```

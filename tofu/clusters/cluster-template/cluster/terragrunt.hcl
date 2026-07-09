@@ -10,7 +10,7 @@ include "root" {
 }
 
 terraform {
-  source = "../../modules/cluster"
+  source = "../../../modules/cluster"
 }
 
 inputs = {
