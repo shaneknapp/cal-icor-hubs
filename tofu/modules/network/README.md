@@ -58,12 +58,12 @@ the rest of the network plumbing. The bucket cannot be created by this module
 
 ## Normal workflow
 
-This module is run through its live unit `spring-2025/network`, which supplies the
+This module is run through its live unit `clusters/spring-2025/network`, which supplies the
 backend and provider via Terragrunt (`export TG_TF_PATH=tofu` first, see the top
 `tofu/README.md`):
 
 ```sh
-cd tofu/spring-2025/network
+cd tofu/clusters/spring-2025/network
 terragrunt init      # wires the gcs backend, downloads the google provider
 terragrunt plan      # first apply expected: 3 to add, 0 to change, 0 to destroy
 terragrunt apply     # creates router + NAT + egress IP (requires approval)

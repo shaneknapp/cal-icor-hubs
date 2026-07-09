@@ -19,7 +19,7 @@ include "root" {
 }
 
 terraform {
-  source = "../../modules/nodepools"
+  source = "../../../modules/nodepools"
 }
 
 inputs = {

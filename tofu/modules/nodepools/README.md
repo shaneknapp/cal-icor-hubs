@@ -8,7 +8,7 @@ the Cloud NAT created by [`modules/network`](../network).
 
 The public-to-private migration is build-alongside, not in-place:
 
-1. A unit under `tofu/spring-2025/<role>-pool/` calls this module to create a new
+1. A unit under `tofu/clusters/spring-2025/<role>-pool/` calls this module to create a new
    private pool next to the existing public one.
 2. The old pool is cordoned and drained onto the new one.
 3. The old (public) pool is deleted once the new one is validated.

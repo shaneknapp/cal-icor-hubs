@@ -12,5 +12,5 @@ include "root" {
 }
 
 terraform {
-  source = "../../modules/network"
+  source = "../../../modules/network"
 }
