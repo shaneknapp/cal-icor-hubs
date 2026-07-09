@@ -2,10 +2,24 @@
 # node pools are separate units. Dev and prod share this config; node VM size is
 # set in the node-pool units.
 
+# Own VPC per cluster (create_network = true) sidesteps the Cloud NAT
+# ALL_SUBNETWORKS collision and firewall-name clashes when a dev cluster runs
+# beside prod. False attaches the subnet to the existing var.network.
+locals {
+  network = var.create_network ? google_compute_network.cluster[0].name : var.network
+}
+
+resource "google_compute_network" "cluster" {
+  count                   = var.create_network ? 1 : 0
+  name                    = var.cluster_name
+  auto_create_subnetworks = false
+  routing_mode            = "REGIONAL"
+}
+
 resource "google_compute_subnetwork" "cluster" {
   name          = coalesce(var.subnet_name, "${var.cluster_name}-subnet")
   region        = var.region
-  network       = var.network
+  network       = local.network
   ip_cidr_range = var.node_cidr_block
 
   private_ip_google_access = true
@@ -21,7 +35,7 @@ resource "google_container_cluster" "cluster" {
   location       = var.location
   node_locations = var.node_locations
 
-  network    = var.network
+  network    = local.network
   subnetwork = google_compute_subnetwork.cluster.name
 
   remove_default_node_pool = true

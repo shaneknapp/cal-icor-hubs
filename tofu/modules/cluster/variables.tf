@@ -21,10 +21,16 @@ variable "region" {
   description = "Region for the cluster's subnet."
 }
 
+variable "create_network" {
+  type        = bool
+  default     = false
+  description = "Create a dedicated VPC named cluster_name (own-VPC-per-cluster). False attaches the subnet to the existing var.network."
+}
+
 variable "network" {
   type        = string
   default     = "default"
-  description = "VPC network for the cluster and its subnet."
+  description = "Existing VPC for the cluster and its subnet when create_network is false. Ignored when create_network is true."
 }
 
 variable "subnet_name" {

@@ -24,6 +24,11 @@ output "self_link" {
   description = "Cluster self link."
 }
 
+output "network_name" {
+  value       = local.network
+  description = "VPC the cluster and its subnet live in. Feeds the network and node-pool units."
+}
+
 output "subnet_name" {
   value       = google_compute_subnetwork.cluster.name
   description = "Cluster subnet name."

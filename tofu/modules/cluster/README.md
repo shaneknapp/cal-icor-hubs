@@ -27,6 +27,7 @@ No modules.
 
 | Name | Type |
 | ---- | ---- |
+| [google_compute_network.cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_network) | resource |
 | [google_compute_subnetwork.cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_subnetwork) | resource |
 | [google_container_cluster.cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster) | resource |
 
@@ -35,10 +36,11 @@ No modules.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | GKE cluster name. Also the unit directory under tofu/. | `string` | n/a | yes |
+| <a name="input_create_network"></a> [create\_network](#input\_create\_network) | Create a dedicated VPC named cluster\_name (own-VPC-per-cluster). False attaches the subnet to the existing var.network. | `bool` | `false` | no |
 | <a name="input_deletion_protection"></a> [deletion\_protection](#input\_deletion\_protection) | Blocks tofu from deleting the cluster. Set false for clusters CI/CD tears down. | `bool` | `true` | no |
 | <a name="input_location"></a> [location](#input\_location) | Cluster location. A region gives a regional cluster. | `string` | `"us-central1"` | no |
 | <a name="input_max_pods_per_node"></a> [max\_pods\_per\_node](#input\_max\_pods\_per\_node) | Default max pods per node. | `number` | `110` | no |
-| <a name="input_network"></a> [network](#input\_network) | VPC network for the cluster and its subnet. | `string` | `"default"` | no |
+| <a name="input_network"></a> [network](#input\_network) | Existing VPC for the cluster and its subnet when create\_network is false. Ignored when create\_network is true. | `string` | `"default"` | no |
 | <a name="input_node_cidr_block"></a> [node\_cidr\_block](#input\_node\_cidr\_block) | Primary subnet range for node IPs. | `string` | n/a | yes |
 | <a name="input_node_locations"></a> [node\_locations](#input\_node\_locations) | Zones the cluster places nodes in. | `list(string)` | <pre>[<br/>  "us-central1-b"<br/>]</pre> | no |
 | <a name="input_pod_cidr_block"></a> [pod\_cidr\_block](#input\_pod\_cidr\_block) | Subnet secondary range for pod IPs. | `string` | n/a | yes |
@@ -55,6 +57,7 @@ No modules.
 | <a name="output_endpoint"></a> [endpoint](#output\_endpoint) | Control-plane API endpoint. |
 | <a name="output_location"></a> [location](#output\_location) | Cluster location (region or zone). |
 | <a name="output_name"></a> [name](#output\_name) | Cluster name. |
+| <a name="output_network_name"></a> [network\_name](#output\_network\_name) | VPC the cluster and its subnet live in. Feeds the network and node-pool units. |
 | <a name="output_node_cidr_block"></a> [node\_cidr\_block](#output\_node\_cidr\_block) | Primary subnet range for node IPs. Feeds the NFS allowlist. |
 | <a name="output_pod_cidr_block"></a> [pod\_cidr\_block](#output\_pod\_cidr\_block) | Subnet secondary range for pod IPs. Feeds the NFS allowlist. |
 | <a name="output_self_link"></a> [self\_link](#output\_self\_link) | Cluster self link. |

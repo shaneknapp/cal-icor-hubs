@@ -17,6 +17,12 @@ tofu/
   bootstrap/                     # global units, not tied to one cluster
     tfstate-bucket/terragrunt.hcl   # -> bootstrap/tfstate-bucket
   cluster-template/              # copy to tofu/<cluster-name>/ to stand up a new cluster
+    cluster/terragrunt.hcl          # VPC + subnet + GKE cluster
+    network/terragrunt.hcl          # Cloud Router, NAT, egress IP, IAP-SSH firewall
+    prometheus-pool/terragrunt.hcl  # one private node pool per role
+    core-pool/terragrunt.hcl
+    support-pool/terragrunt.hcl
+    user-pool/terragrunt.hcl
   spring-2025/                   # live units; one state file each, key derived from path
     network/terragrunt.hcl          # -> state prefix spring-2025/network
     prometheus-pool/terragrunt.hcl  # -> spring-2025/prometheus-pool
