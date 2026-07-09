@@ -10,6 +10,7 @@ Add a new module as `modules/<name>/`, then create a unit
 
 Modules here:
 
+- `cluster/`: reusable GKE cluster (default pool removed; pools are separate units).
 - `network/`: Cloud Router, Cloud NAT, reserved egress IP, and the IAP-SSH firewall.
 - `nodepools/`: reusable private GKE node-pool module (one pool per unit).
 
