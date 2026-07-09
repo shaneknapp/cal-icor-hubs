@@ -1,12 +1,7 @@
 # tofu/network: Cloud Router + NAT for spring-2025
 
-Phase A of the public-to-private node migration. This root module creates the
-**outbound** egress path that private nodes need: a Cloud Router, a Cloud NAT
-gateway, and a reserved static egress IP.
-
-This was the first OpenTofu-managed resource in the repo (new-resources-first
-adoption). The node pools are now tofu-managed too (see `modules/nodepools`); the
-GKE cluster itself remains out-of-band.
+This root module creates the **outbound** egress path that private nodes need:
+a Cloud Router, a Cloud NAT gateway, and a reserved static egress IP.
 
 ## What this does and does not touch
 

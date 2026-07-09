@@ -35,8 +35,9 @@ tofu/
 
 Each leaf `terragrunt.hcl` is a *unit*: it `include`s `root.hcl` and points at a
 module via `terraform { source = "../../../modules/<name>" }`. The unit's path under
-`tofu/` becomes its GCS state prefix (e.g. `clusters/spring-2025/network`), so backends are
-never hand-written and state keys stay stable.
+`tofu/` becomes its GCS state prefix (e.g. `clusters/spring-2025/network`), so backends
+are never hand-written. The key follows the unit's directory, so moving a unit means
+relocating its state object in the bucket to the matching prefix.
 
 ## Running a unit
 

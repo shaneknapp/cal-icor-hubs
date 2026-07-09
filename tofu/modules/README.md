@@ -13,6 +13,7 @@ Modules here:
 - `cluster/`: reusable GKE cluster (default pool removed; pools are separate units).
 - `network/`: Cloud Router, Cloud NAT, reserved egress IP, and the IAP-SSH firewall.
 - `nodepools/`: reusable private GKE node-pool module (one pool per unit).
+- `tfstate-bucket`: initial setup for the GCS tfstate bucket
 
 The table below is empty because this directory contains no resources of its
 own; see each subdirectory's README (`network/`, `nodepools/`) for the real docs.
