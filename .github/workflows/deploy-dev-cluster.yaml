@@ -19,7 +19,7 @@ on:
       command:
         description: "terragrunt run --all command"
         type: choice
-        options: [apply, plan]
+        options: [apply, plan, destroy]
         default: plan
   push:
     branches:
