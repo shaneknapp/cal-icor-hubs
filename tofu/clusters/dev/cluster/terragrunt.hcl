@@ -21,6 +21,12 @@ inputs = {
   # Zonal, not regional: a zone here gives a single-zone cluster in us-central1-b.
   location = "us-central1-b"
 
+  # Empty overrides the module default ["us-central1-b"] (written for the regional
+  # prod cluster). For a zonal cluster, node_locations must NOT list its own zone,
+  # so nodes just land in the cluster's zone. Pool-level node_locations still pin
+  # each pool to us-central1-b (google_container_node_pool, different semantics).
+  node_locations = []
+
   # Own VPC, fresh non-colliding ranges; CI can tear it down.
   create_network      = true
   node_cidr_block     = "10.10.0.0/22"
