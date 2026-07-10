@@ -58,15 +58,17 @@ jobs:
         run: |
           should_plan=false
           should_apply=false
+          should_destroy=false
           if [[ "$EVENT" == "workflow_dispatch" ]]; then
-            # Manual run honors the dropdown: plan OR apply, never both.
-            if [[ "$CMD" == "plan" ]]; then
-              should_plan=true
-            else
-              should_apply=true
-            fi
+            # Manual run honors the dropdown: exactly one of plan/apply/destroy.
+            case "$CMD" in
+              plan)    should_plan=true ;;
+              apply)   should_apply=true ;;
+              destroy) should_destroy=true ;;
+            esac
           else
             # Labeled merge to staging: plan first, then apply if the plan holds.
+            # A staging merge never destroys.
             for label in $LABELS; do
               if [[ "$label" == "tofu-dev" ]]; then
                 should_plan=true
@@ -76,10 +78,11 @@ jobs:
           fi
           echo "should_plan=$should_plan" >> "$GITHUB_OUTPUT"
           echo "should_apply=$should_apply" >> "$GITHUB_OUTPUT"
-          if [[ "$should_plan" == "true" || "$should_apply" == "true" ]]; then
+          echo "should_destroy=$should_destroy" >> "$GITHUB_OUTPUT"
+          if [[ "$should_plan" == "true" || "$should_apply" == "true" || "$should_destroy" == "true" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           fi
-          echo "Plan: $should_plan  Apply: $should_apply"
+          echo "Plan: $should_plan  Apply: $should_apply  Destroy: $should_destroy"
 
       - name: Check out the repo
         if: ${{ success() && steps.gate.outputs.run == 'true' }}
@@ -121,3 +124,10 @@ jobs:
         if: ${{ success() && steps.gate.outputs.should_apply == 'true' }}
         working-directory: tofu/clusters/dev
         run: terragrunt run --all apply
+
+      # Manual teardown only (never reached by a staging merge). Walks the DAG in
+      # reverse; TG_NON_INTERACTIVE auto-approves.
+      - name: terragrunt run --all destroy
+        if: ${{ success() && steps.gate.outputs.should_destroy == 'true' }}
+        working-directory: tofu/clusters/dev
+        run: terragrunt run --all destroy
