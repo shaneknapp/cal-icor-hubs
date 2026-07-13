@@ -94,7 +94,8 @@ def create_label(hub_name: str, root_path: str) -> str:
 'hub: {hub_name}':
   - 'deployments/{hub_name}/**'
 """.strip()
-    labeler_path.write_text(hub_label, append=True)
+    with labeler_path.open("a") as labeler_file:
+        labeler_file.write(f"\n{hub_label}\n")
     print(f"Added {hub_name} to the labeler.yml file.")
 
     # create the github label for the new hub
