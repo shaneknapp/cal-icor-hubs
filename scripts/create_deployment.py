@@ -542,6 +542,10 @@ def create_deployment(
     # Create a pull request for the new hub
     if dry_run:
         print(f"Dry run enabled. Not creating pull request for {config['hub_name']}.")
+    elif args.no_pr:
+        print(
+            f"Skipping pull request creation for {config['hub_name']} as per --no-pr flag."
+        )
     else:
         print(f"Creating pull request for {config['hub_name']}.")
         create_pr(github_user, config["hub_name"], branch_name, github_label)
@@ -650,6 +654,12 @@ if __name__ == "__main__":
         help="If set, the script will ask for confirmation for each step, "
         + "allowing you to manually configure the deployment (eg: custom "
         + "node pool deployment, etc).",
+    )
+    parser.add_argument(
+        "--no-pr",
+        "-n",
+        action="store_true",
+        help="If set, the script will not create a pull request after creating the deployment.",
     )
     parser.add_argument(
         "--dry-run",
