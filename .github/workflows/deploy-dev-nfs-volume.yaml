@@ -69,11 +69,11 @@ jobs:
           # spec.nfs is immutable, so this is a no-op once the PVs exist. If the NFS
           # server is ever rebuilt onto a new ClusterIP, delete the PVs and re-run.
           #
+          export NFS_SERVER_IP
           # The single quotes are load-bearing: envsubst's shell-format argument is the
           # literal '${NFS_SERVER_IP}', naming the one variable it may substitute. Let
           # the shell expand it and envsubst would replace every $VAR in the file.
           # shellcheck disable=SC2016
-          export NFS_SERVER_IP
           envsubst '${NFS_SERVER_IP}' < dev/nfs-volume.yaml | kubectl apply -f -
 
       - name: Show the bound volumes
