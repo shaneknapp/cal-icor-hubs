@@ -87,12 +87,12 @@ jobs:
       id-token: write
     secrets: inherit
 
-  support:
-    needs: [gate, cluster]
-    # Runs if cluster succeeded OR was skipped (support-only change); not if it failed.
-    if: ${{ !cancelled() && !failure() && needs.gate.outputs.deploy_support == 'true' }}
-    uses: ./.github/workflows/deploy-dev-support.yaml
-    permissions:
-      contents: read
-      id-token: write
-    secrets: inherit
+  # support:
+  #   needs: [gate, cluster]
+  #   # Runs if cluster succeeded OR was skipped (support-only change); not if it failed.
+  #   if: ${{ !cancelled() && !failure() && needs.gate.outputs.deploy_support == 'true' }}
+  #   uses: ./.github/workflows/deploy-dev-support.yaml
+  #   permissions:
+  #     contents: read
+  #     id-token: write
+  #   secrets: inherit
