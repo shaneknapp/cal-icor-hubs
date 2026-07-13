@@ -47,6 +47,15 @@ jobs:
           location: ${{ vars.DEV_ZONE }}
           project_id: ${{ vars.DEV_PROJECT }}
 
+      # Helm maps every manifest before applying any, so the ClusterIssuer in
+      # support/templates needs these to already exist; the chart's own cert-manager
+      # dependency installs them too late. Version tracks support/requirements.yaml.
+      - name: Install cert-manager CRDs
+        run: |
+          cm=$(awk '/name: cert-manager/{f=1} f&&/version:/{print $2; exit}' support/requirements.yaml)
+          kubectl apply --server-side \
+            -f "https://github.com/cert-manager/cert-manager/releases/download/${cm}/cert-manager.crds.yaml"
+
       - name: Install SOPS
         run: |
           mkdir -p "${HOME}/bin"
