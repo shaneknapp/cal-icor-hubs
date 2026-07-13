@@ -12,9 +12,16 @@ name: Deploy dev cluster stack
 # not part of the hub deploy, so redeploying a hub does not re-apply a volume.
 #
 # Merge to staging picks layers by PR label: tofu-dev -> cluster, support-dev ->
-# support, nfs-dev -> nfs, nfs-volume-dev -> nfs-volume, hub-dev -> hub. A merge never
-# destroys; teardown is a dispatch, and destroying the cluster takes the helm releases
-# with it.
+# support, nfs-dev -> nfs, nfs-volume-dev -> nfs-volume, hub-dev -> hub.
+#
+# The hub follows the same staging -> prod promotion as the prod hubs: a merge to
+# `staging` deploys the staging hub, and the later staging -> prod merge deploys the
+# prod hub. Only the hub is per-environment. The cluster and the support, nfs, and
+# nfs-volume layers are single cluster-wide instances shared by both hubs, so they only
+# ever deploy from staging and are forced off on a prod merge.
+#
+# A merge never destroys; teardown is a dispatch, and destroying the cluster takes the
+# helm releases with it.
 
 permissions:
   contents: read
@@ -41,12 +48,18 @@ on:
         type: boolean
         default: false
       deploy_hub:
-        description: "Deploy the dev hub (staging and prod)"
+        description: "Deploy the dev hub"
         type: boolean
         default: false
+      hub_environment:
+        description: "Which hub environment to deploy"
+        type: choice
+        options: [staging, prod]
+        default: staging
   push:
     branches:
       - staging
+      - prod
 
 jobs:
   gate:
@@ -57,6 +70,7 @@ jobs:
       deploy_nfs: ${{ steps.decide.outputs.deploy_nfs }}
       deploy_nfs_volume: ${{ steps.decide.outputs.deploy_nfs_volume }}
       deploy_hub: ${{ steps.decide.outputs.deploy_hub }}
+      hub_environment: ${{ steps.decide.outputs.hub_environment }}
     steps:
       - name: Get PR labels
         id: pr-labels
@@ -69,12 +83,14 @@ jobs:
         id: decide
         env:
           EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
           LABELS: ${{ steps.pr-labels.outputs.labels }}
           CMD: ${{ inputs.cluster_command }}
           SUPPORT: ${{ inputs.deploy_support }}
           NFS: ${{ inputs.deploy_nfs }}
           NFS_VOLUME: ${{ inputs.deploy_nfs_volume }}
           HUB: ${{ inputs.deploy_hub }}
+          HUB_ENV: ${{ inputs.hub_environment }}
         run: |
           if [[ "$EVENT" == "workflow_dispatch" ]]; then
             cluster_command="$CMD"
@@ -82,12 +98,23 @@ jobs:
             deploy_nfs="$NFS"
             deploy_nfs_volume="$NFS_VOLUME"
             deploy_hub="$HUB"
+            hub_environment="$HUB_ENV"
           else
             cluster_command=skip
             deploy_support=false
             deploy_nfs=false
             deploy_nfs_volume=false
             deploy_hub=false
+
+            # The branch picks the hub environment, exactly as it does for the prod
+            # hubs: staging deploys on a merge to staging, prod on the staging -> prod
+            # merge.
+            if [[ "$REF" == "refs/heads/prod" ]]; then
+              hub_environment=prod
+            else
+              hub_environment=staging
+            fi
+
             for label in $LABELS; do
               case "$label" in
                 tofu-dev)       cluster_command=apply ;;
@@ -97,6 +124,16 @@ jobs:
                 hub-dev)        deploy_hub=true ;;
               esac
             done
+
+            # The cluster and the support, nfs and nfs-volume layers are one shared
+            # instance each, not one per hub environment. They deploy from staging.
+            # A prod merge promotes the hub and nothing else.
+            if [[ "$REF" == "refs/heads/prod" ]]; then
+              cluster_command=skip
+              deploy_support=false
+              deploy_nfs=false
+              deploy_nfs_volume=false
+            fi
           fi
 
           # Don't leave the helm layers chasing a cluster that's going away.
@@ -113,9 +150,10 @@ jobs:
             echo "deploy_nfs=$deploy_nfs"
             echo "deploy_nfs_volume=$deploy_nfs_volume"
             echo "deploy_hub=$deploy_hub"
+            echo "hub_environment=$hub_environment"
           } >> "$GITHUB_OUTPUT"
           echo "Cluster: $cluster_command  Support: $deploy_support  NFS: $deploy_nfs" \
-               "NFS volume: $deploy_nfs_volume  Hub: $deploy_hub"
+               "NFS volume: $deploy_nfs_volume  Hub: $deploy_hub ($hub_environment)"
 
   cluster:
     needs: gate
@@ -166,6 +204,8 @@ jobs:
     # Last: the user pods mount the PVC that nfs-volume applies.
     if: ${{ !cancelled() && !failure() && needs.gate.outputs.deploy_hub == 'true' }}
     uses: ./.github/workflows/deploy-dev-hub.yaml
+    with:
+      environment: ${{ needs.gate.outputs.hub_environment }}
     permissions:
       contents: read
       id-token: write
