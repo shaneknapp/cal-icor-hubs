@@ -2,14 +2,19 @@ name: Deploy dev cluster stack
 
 # Single entry point for the dev cluster. Owns the label gate and the ordering:
 #
-#   cluster (tofu, dev-infra) -> support (helm) -> nfs (helm) -> hub (Phase 3)
+#   cluster (tofu, dev-infra) -> support (helm) -> nfs (helm) -> nfs-volume -> hub
 #
 # `needs:` keeps each layer from racing the one before it, and skips it if that one
 # fails. Each called workflow names its own environment: the layers use different SAs.
 #
+# nfs-volume sits between nfs and hub because it reads the NFS server's ClusterIP out
+# of the cluster and writes the PV/PVC the hub's user pods mount. It is its own layer,
+# not part of the hub deploy, so redeploying a hub does not re-apply a volume.
+#
 # Merge to staging picks layers by PR label: tofu-dev -> cluster, support-dev ->
-# support, nfs-dev -> nfs. A merge never destroys; teardown is a dispatch, and
-# destroying the cluster takes the helm releases with it.
+# support, nfs-dev -> nfs, nfs-volume-dev -> nfs-volume, hub-dev -> hub. A merge never
+# destroys; teardown is a dispatch, and destroying the cluster takes the helm releases
+# with it.
 
 permissions:
   contents: read
@@ -31,6 +36,14 @@ on:
         description: "Deploy the jupyterhub-home-nfs chart afterwards"
         type: boolean
         default: false
+      deploy_nfs_volume:
+        description: "Apply the home PV/PVC (discovers the NFS ClusterIP)"
+        type: boolean
+        default: false
+      deploy_hub:
+        description: "Deploy the dev hub (staging and prod)"
+        type: boolean
+        default: false
   push:
     branches:
       - staging
@@ -42,6 +55,8 @@ jobs:
       cluster_command: ${{ steps.decide.outputs.cluster_command }}
       deploy_support: ${{ steps.decide.outputs.deploy_support }}
       deploy_nfs: ${{ steps.decide.outputs.deploy_nfs }}
+      deploy_nfs_volume: ${{ steps.decide.outputs.deploy_nfs_volume }}
+      deploy_hub: ${{ steps.decide.outputs.deploy_hub }}
     steps:
       - name: Get PR labels
         id: pr-labels
@@ -58,20 +73,28 @@ jobs:
           CMD: ${{ inputs.cluster_command }}
           SUPPORT: ${{ inputs.deploy_support }}
           NFS: ${{ inputs.deploy_nfs }}
+          NFS_VOLUME: ${{ inputs.deploy_nfs_volume }}
+          HUB: ${{ inputs.deploy_hub }}
         run: |
           if [[ "$EVENT" == "workflow_dispatch" ]]; then
             cluster_command="$CMD"
             deploy_support="$SUPPORT"
             deploy_nfs="$NFS"
+            deploy_nfs_volume="$NFS_VOLUME"
+            deploy_hub="$HUB"
           else
             cluster_command=skip
             deploy_support=false
             deploy_nfs=false
+            deploy_nfs_volume=false
+            deploy_hub=false
             for label in $LABELS; do
               case "$label" in
-                tofu-dev)    cluster_command=apply ;;
-                support-dev) deploy_support=true ;;
-                nfs-dev)     deploy_nfs=true ;;
+                tofu-dev)       cluster_command=apply ;;
+                support-dev)    deploy_support=true ;;
+                nfs-dev)        deploy_nfs=true ;;
+                nfs-volume-dev) deploy_nfs_volume=true ;;
+                hub-dev)        deploy_hub=true ;;
               esac
             done
           fi
@@ -80,14 +103,19 @@ jobs:
           if [[ "$cluster_command" == "destroy" ]]; then
             deploy_support=false
             deploy_nfs=false
+            deploy_nfs_volume=false
+            deploy_hub=false
           fi
 
           {
             echo "cluster_command=$cluster_command"
             echo "deploy_support=$deploy_support"
             echo "deploy_nfs=$deploy_nfs"
+            echo "deploy_nfs_volume=$deploy_nfs_volume"
+            echo "deploy_hub=$deploy_hub"
           } >> "$GITHUB_OUTPUT"
-          echo "Cluster: $cluster_command  Support: $deploy_support  NFS: $deploy_nfs"
+          echo "Cluster: $cluster_command  Support: $deploy_support  NFS: $deploy_nfs" \
+               "NFS volume: $deploy_nfs_volume  Hub: $deploy_hub"
 
   cluster:
     needs: gate
@@ -113,10 +141,31 @@ jobs:
   nfs:
     needs: [gate, cluster, support]
     # Same rule: runs if the layers before it succeeded or were skipped, not if one
-    # failed. NFS doesn't depend on the support chart, but ordering it last keeps a
+    # failed. NFS doesn't depend on the support chart, but ordering it keeps a
     # from-scratch rebuild in one predictable sequence.
     if: ${{ !cancelled() && !failure() && needs.gate.outputs.deploy_nfs == 'true' }}
     uses: ./.github/workflows/deploy-dev-nfs.yaml
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
+
+  nfs-volume:
+    needs: [gate, cluster, support, nfs]
+    # Must follow nfs: it reads the ClusterIP off the running home-nfs Service. Its own
+    # layer, so a hub redeploy doesn't re-apply the volume.
+    if: ${{ !cancelled() && !failure() && needs.gate.outputs.deploy_nfs_volume == 'true' }}
+    uses: ./.github/workflows/deploy-dev-nfs-volume.yaml
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
+
+  hub:
+    needs: [gate, cluster, support, nfs, nfs-volume]
+    # Last: the user pods mount the PVC that nfs-volume applies.
+    if: ${{ !cancelled() && !failure() && needs.gate.outputs.deploy_hub == 'true' }}
+    uses: ./.github/workflows/deploy-dev-hub.yaml
     permissions:
       contents: read
       id-token: write

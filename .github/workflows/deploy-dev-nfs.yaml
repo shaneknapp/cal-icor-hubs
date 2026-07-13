@@ -53,3 +53,13 @@ jobs:
             --create-namespace --namespace=jupyterhub-home-nfs \
             jupyterhub-home-nfs jupyterhub-home-nfs/ \
             -f dev/nfs-values.yaml
+
+      # --wait above is a placebo on this chart. Helm's Deployment readiness test is
+      # readyReplicas >= replicas - maxUnavailable, and the chart hardcodes replicas: 1
+      # with maxUnavailable: 1, so 0 >= 0 clears instantly: the first deploy went green
+      # in 14 seconds with the pod still ContainerCreating. Assert on the rollout.
+      - name: Wait for the NFS server to actually roll out
+        run: |
+          kubectl rollout status deployment/home-nfs \
+            -n jupyterhub-home-nfs --timeout=10m
+          kubectl get pods -n jupyterhub-home-nfs

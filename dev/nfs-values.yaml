@@ -11,10 +11,15 @@ jupyterhub-home-nfs:
     # 30 GB and blank; the PD CSI driver mkfs.xfs's it on first attach.
     volumeId: projects/cal-icor-hubs/zones/us-central1-b/disks/dev-nfs-homedirs
 
-  # Off until the dev hub lands. It manages /export/dev/* (and creates those dirs),
-  # so it gets turned on with paths in the hub PR.
+  # On now that the dev hub exists. create_deployment.py already made these dirs on
+  # the NFS server; prod keeps the same list in jupyterhub-home-nfs/values.yaml.
   quotaEnforcer:
-    enabled: false
+    enabled: true
+    config:
+      QuotaManager:
+        paths: [
+          "/export/dev/staging", "/export/dev/prod"
+        ]
 
   nfsServer:
     enableClientAllowlist: true
