@@ -2,14 +2,14 @@ name: Deploy dev cluster stack
 
 # Single entry point for the dev cluster. Owns the label gate and the ordering:
 #
-#   cluster (tofu, dev-infra)  ->  support (helm, dev-deploy)  ->  hub (Phase 3)
+#   cluster (tofu, dev-infra) -> support (helm) -> nfs (helm) -> hub (Phase 3)
 #
-# `needs:` keeps support from racing the cluster, and skips it if the apply fails.
-# Each called workflow names its own environment: the layers use different SAs.
+# `needs:` keeps each layer from racing the one before it, and skips it if that one
+# fails. Each called workflow names its own environment: the layers use different SAs.
 #
 # Merge to staging picks layers by PR label: tofu-dev -> cluster, support-dev ->
-# support. A merge never destroys; teardown is a dispatch, and destroying the
-# cluster takes the helm releases with it.
+# support, nfs-dev -> nfs. A merge never destroys; teardown is a dispatch, and
+# destroying the cluster takes the helm releases with it.
 
 permissions:
   contents: read
@@ -27,6 +27,10 @@ on:
         description: "Deploy the support chart afterwards"
         type: boolean
         default: false
+      deploy_nfs:
+        description: "Deploy the jupyterhub-home-nfs chart afterwards"
+        type: boolean
+        default: false
   push:
     branches:
       - staging
@@ -37,6 +41,7 @@ jobs:
     outputs:
       cluster_command: ${{ steps.decide.outputs.cluster_command }}
       deploy_support: ${{ steps.decide.outputs.deploy_support }}
+      deploy_nfs: ${{ steps.decide.outputs.deploy_nfs }}
     steps:
       - name: Get PR labels
         id: pr-labels
@@ -52,29 +57,37 @@ jobs:
           LABELS: ${{ steps.pr-labels.outputs.labels }}
           CMD: ${{ inputs.cluster_command }}
           SUPPORT: ${{ inputs.deploy_support }}
+          NFS: ${{ inputs.deploy_nfs }}
         run: |
           if [[ "$EVENT" == "workflow_dispatch" ]]; then
             cluster_command="$CMD"
             deploy_support="$SUPPORT"
+            deploy_nfs="$NFS"
           else
             cluster_command=skip
             deploy_support=false
+            deploy_nfs=false
             for label in $LABELS; do
               case "$label" in
                 tofu-dev)    cluster_command=apply ;;
                 support-dev) deploy_support=true ;;
+                nfs-dev)     deploy_nfs=true ;;
               esac
             done
           fi
 
-          # Don't leave support chasing a cluster that's going away.
+          # Don't leave the helm layers chasing a cluster that's going away.
           if [[ "$cluster_command" == "destroy" ]]; then
             deploy_support=false
+            deploy_nfs=false
           fi
 
-          echo "cluster_command=$cluster_command" >> "$GITHUB_OUTPUT"
-          echo "deploy_support=$deploy_support" >> "$GITHUB_OUTPUT"
-          echo "Cluster: $cluster_command  Support: $deploy_support"
+          {
+            echo "cluster_command=$cluster_command"
+            echo "deploy_support=$deploy_support"
+            echo "deploy_nfs=$deploy_nfs"
+          } >> "$GITHUB_OUTPUT"
+          echo "Cluster: $cluster_command  Support: $deploy_support  NFS: $deploy_nfs"
 
   cluster:
     needs: gate
@@ -92,6 +105,18 @@ jobs:
     # Runs if cluster succeeded OR was skipped (support-only change); not if it failed.
     if: ${{ !cancelled() && !failure() && needs.gate.outputs.deploy_support == 'true' }}
     uses: ./.github/workflows/deploy-dev-support.yaml
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
+
+  nfs:
+    needs: [gate, cluster, support]
+    # Same rule: runs if the layers before it succeeded or were skipped, not if one
+    # failed. NFS doesn't depend on the support chart, but ordering it last keeps a
+    # from-scratch rebuild in one predictable sequence.
+    if: ${{ !cancelled() && !failure() && needs.gate.outputs.deploy_nfs == 'true' }}
+    uses: ./.github/workflows/deploy-dev-nfs.yaml
     permissions:
       contents: read
       id-token: write
