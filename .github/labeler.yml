@@ -104,6 +104,12 @@ support-dev:
   - 'dev/support-values.yaml'
   - 'dev/secrets.yaml'
 
+# jupyterhub-home-nfs chart on the DEV cluster. Same reasoning: NOT under
+# jupyterhub-home-nfs/**, which carries `jupyterhub-home-nfs-deployment` and would
+# deploy the PROD chart.
+nfs-dev:
+  - 'dev/nfs-values.yaml'
+
 # tofu cluster (control plane / VPC; dev creates its cluster via this module)
 tofu-cluster:
   - 'tofu/modules/cluster/**'
