@@ -5,8 +5,6 @@
 # support/**, which deploys the PROD chart.
 
 cert-manager:
-  # Subchart reads its own scope; prod's top-level --set installCRDs does not reach it.
-  installCRDs: true
   nodeSelector:
     hub.jupyter.org/pool-name: support-pool
   cainjector:
