@@ -24,15 +24,11 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v6
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v3
+      - name: Authenticate to the dev cluster
+        uses: ./.github/actions/gke-auth
         with:
           workload_identity_provider: ${{ vars.DEV_WIF_PROVIDER }}
           service_account: ${{ vars.DEV_DEPLOY_SA }}
-
-      - name: Get dev cluster credentials
-        uses: google-github-actions/get-gke-credentials@v2
-        with:
           cluster_name: ${{ vars.DEV_CLUSTER }}
           location: ${{ vars.DEV_ZONE }}
           project_id: ${{ vars.DEV_PROJECT }}
