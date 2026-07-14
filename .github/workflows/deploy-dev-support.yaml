@@ -23,20 +23,16 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v6
 
-      - name: Authenticate to Google Cloud
+      - name: Authenticate to the dev cluster
         id: auth
-        uses: google-github-actions/auth@v3
+        uses: ./.github/actions/gke-auth
         with:
           workload_identity_provider: ${{ vars.DEV_WIF_PROVIDER }}
           service_account: ${{ vars.DEV_DEPLOY_SA }}
-          token_format: access_token
-
-      - name: Get dev cluster credentials
-        uses: google-github-actions/get-gke-credentials@v2
-        with:
           cluster_name: ${{ vars.DEV_CLUSTER }}
           location: ${{ vars.DEV_ZONE }}
           project_id: ${{ vars.DEV_PROJECT }}
+          token_format: access_token
 
       # Helm maps every manifest before applying any, so the ClusterIssuer in
       # support/templates needs the CRDs to already exist. The chart's own cert-manager
@@ -48,12 +44,7 @@ jobs:
             -f "https://github.com/cert-manager/cert-manager/releases/download/${cm}/cert-manager.crds.yaml"
 
       - name: Install SOPS
-        run: |
-          mkdir -p "${HOME}/bin"
-          curl -sSL https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64 \
-            -o "${HOME}/bin/sops"
-          chmod 755 "${HOME}/bin/sops"
-          echo "${HOME}/bin" >> "$GITHUB_PATH"
+        uses: ./.github/actions/install-sops
 
       - name: Log in to the GAR helm registry
         env:
