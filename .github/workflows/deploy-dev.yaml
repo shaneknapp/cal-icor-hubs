@@ -6,6 +6,12 @@ permissions:
   contents: read
   id-token: write
 
+# The leaf workflows serialize themselves, but only against their own kind. This keeps two
+# runs from interleaving layers against the one shared cluster.
+concurrency:
+  group: dev-stack
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:
     inputs:
@@ -140,7 +146,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    secrets: inherit
 
   support:
     needs: [gate, cluster]
@@ -149,7 +154,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    secrets: inherit
 
   nfs:
     needs: [gate, cluster, support]
@@ -158,7 +162,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    secrets: inherit
 
   # Must follow nfs, because it reads the ClusterIP from the running home-nfs Service.
   nfs-volume:
@@ -168,7 +171,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    secrets: inherit
 
   hub:
     needs: [gate, cluster, support, nfs, nfs-volume]
@@ -179,4 +181,3 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    secrets: inherit
