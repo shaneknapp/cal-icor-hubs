@@ -100,11 +100,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Install SOPS
-        run: |
-          mkdir -p "${HOME}/bin"
-          curl -sSL https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64 -o "${HOME}/bin/sops"
-          chmod 755 "${HOME}/bin/sops"
-          echo "${HOME}/bin" >> "$GITHUB_PATH"
+        uses: ./.github/actions/install-sops
 
       - name: Auth to gcloud
         uses: google-github-actions/auth@v3
@@ -204,11 +200,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Install SOPS
-        run: |
-          mkdir -p "${HOME}/bin"
-          curl -sSL https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64 -o "${HOME}/bin/sops"
-          chmod 755 "${HOME}/bin/sops"
-          echo "${HOME}/bin" >> "$GITHUB_PATH"
+        uses: ./.github/actions/install-sops
 
       - name: Auth to gcloud
         uses: google-github-actions/auth@v3
