@@ -35,11 +35,13 @@ jobs:
           location: ${{ vars.DEV_ZONE }}
           project_id: ${{ vars.DEV_PROJECT }}
 
+      # No --wait here. The chart pins replicas=1 and maxUnavailable=1, which makes helm's
+      # readiness check pass with zero ready pods. kubectl rollout status is the real gate.
       - name: Deploy the jupyterhub-home-nfs chart
         run: |
           helm dep up jupyterhub-home-nfs
           helm upgrade \
-            --install --wait --timeout 10m \
+            --install --timeout 10m \
             --create-namespace --namespace=jupyterhub-home-nfs \
             jupyterhub-home-nfs jupyterhub-home-nfs/ \
             -f dev/nfs-values.yaml

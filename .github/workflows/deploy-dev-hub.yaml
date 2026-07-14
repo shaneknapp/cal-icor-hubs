@@ -67,7 +67,7 @@ jobs:
           # release and those are cluster-scoped, so if both releases were named `dev`
           # the second would collide with the first.
           helm upgrade \
-            --install --wait --timeout 15m \
+            --install --timeout 15m \
             --create-namespace --namespace="dev-${ENV}" \
             "dev-${ENV}" hub/ \
             -f deployments/dev/config/common.yaml \

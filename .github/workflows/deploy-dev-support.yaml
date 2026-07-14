@@ -74,8 +74,15 @@ jobs:
           helm repo update
           helm dep up support
           helm upgrade \
-            --install --wait --timeout 15m \
+            --install --timeout 15m \
             --create-namespace --namespace=support \
             support support/ \
             -f dev/support-values.yaml \
             -f dev/secrets.yaml
+
+      - name: Wait for the support workloads to actually roll out
+        run: |
+          for w in $(kubectl -n support get deploy,statefulset,daemonset -o name); do
+            kubectl -n support rollout status "$w" --timeout=10m
+          done
+          kubectl get pods -n support
