@@ -6,6 +6,10 @@ permissions:
   contents: read
   id-token: write
 
+defaults:
+  run:
+    shell: bash
+
 # The leaf workflows serialize themselves, but only against their own kind. This keeps two
 # runs from interleaving layers against the one shared cluster.
 concurrency:
