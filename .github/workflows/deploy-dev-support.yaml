@@ -1,14 +1,7 @@
 name: Deploy dev support chart (helm)
-
 # Installs the support chart on the dev cluster with raw helm.
 # Called by deploy-dev.yaml after the cluster job, so it can never race the cluster.
-#
-# Keyless as dev-deploy, whose WIF binding is pinned to the `dev-deploy` environment.
-# That SA holds only container.clusterViewer project-wide; its write comes from a
-# cluster-admin binding that exists in the dev cluster alone.
-#
-# Never touches support/secrets.yaml: that uses the `sops` key, which also unlocks
-# every prod secret. Dev secrets use the separate `sops-dev` key.
+# Uses dev/secrets.yaml (sops-dev key) for grafana auth.
 
 permissions:
   contents: read
@@ -30,8 +23,7 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v6
 
-      # access_token feeds the helm registry login below, so gcloud is never needed.
-      - name: Authenticate to Google Cloud (keyless WIF)
+      - name: Authenticate to Google Cloud
         id: auth
         uses: google-github-actions/auth@v3
         with:
@@ -39,7 +31,6 @@ jobs:
           service_account: ${{ vars.DEV_DEPLOY_SA }}
           token_format: access_token
 
-      # Embeds a short-lived token in the kubeconfig and exports KUBECONFIG.
       - name: Get dev cluster credentials
         uses: google-github-actions/get-gke-credentials@v2
         with:
@@ -48,8 +39,8 @@ jobs:
           project_id: ${{ vars.DEV_PROJECT }}
 
       # Helm maps every manifest before applying any, so the ClusterIssuer in
-      # support/templates needs these to already exist; the chart's own cert-manager
-      # dependency installs them too late. Version tracks support/requirements.yaml.
+      # support/templates needs the CRDs to already exist. The chart's own cert-manager
+      # dependency installs them too late.
       - name: Install cert-manager CRDs
         run: |
           cm=$(awk '/name: cert-manager/{f=1} f&&/version:/{print $2; exit}' support/requirements.yaml)
@@ -64,8 +55,6 @@ jobs:
           chmod 755 "${HOME}/bin/sops"
           echo "${HOME}/bin" >> "$GITHUB_PATH"
 
-      # helm dep up resolves every dependency regardless of what values switch off,
-      # and node-placeholder-scaler lives in a private GAR OCI registry.
       - name: Log in to the GAR helm registry
         env:
           ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
@@ -76,7 +65,6 @@ jobs:
 
       - name: Deploy the support chart
         run: |
-          # sops picks up the WIF credentials from ADC.
           sops -d -i dev/secrets.yaml
 
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
