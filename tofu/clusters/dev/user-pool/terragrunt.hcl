@@ -41,8 +41,8 @@ inputs = {
   node_locations = ["us-central1-b"]
 
   machine_type    = "e2-medium"
-  min_nodes       = 0 # scales to zero when the user is not logged in
-  max_nodes       = 1 # exactly one dev user
+  min_nodes       = 1 # so we always have a node for the single dev user
+  max_nodes       = 1
   location_policy = "ANY"
   disk_size_gb    = 50
 
