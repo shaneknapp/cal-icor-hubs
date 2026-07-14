@@ -7,7 +7,7 @@
 
 jupyterhub-home-nfs:
   gke:
-    enabled: true    
+    enabled: true
     # 30 GB and blank; the PD CSI driver mkfs.xfs's it on first attach.
     volumeId: projects/cal-icor-hubs/zones/us-central1-b/disks/dev-nfs-homedirs
 
