@@ -138,5 +138,10 @@ repos:
       - id: check-executables-have-shebangs
 
 # pre-commit.ci config reference: https://pre-commit.ci/#configuration
-#ci:
-#  autoupdate_schedule: monthly
+ci:
+  autoupdate_schedule: monthly
+  skip:
+    - tofu_fmt
+    - terragrunt_hcl_fmt
+    - terragrunt_hcl_validate
+    - terraform-docs-go
