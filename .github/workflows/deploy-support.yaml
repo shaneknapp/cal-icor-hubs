@@ -2,7 +2,7 @@ name: Deploy support helm chart
 # use echo ${VAR##*: } to get the value of a variable that is a string with a colon in it
 permissions:
   contents: read
-  id-token: write  # mint the OIDC token for the keyless WIF login canary
+  id-token: write  # mint the OIDC token for keyless WIF auth
 on:
   workflow_dispatch:
   push:
@@ -20,17 +20,6 @@ jobs:
         uses: irby/get-labels-on-push@v1.2.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      # Canary for the keyless-auth cutover, placed BEFORE the label check so it runs
-      # on every staging push regardless of whether the chart deploys. Proves keyless
-      # WIF login (prod-deploy@ impersonation) works here. Non-fatal. Next PR: move
-      # this into the deploy job and drop the GKE_KEY/SOPS key path.
-      - name: Log in to Google Cloud via WIF (canary, non-fatal)
-        continue-on-error: true
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ vars.PROD_WIF_PROVIDER }}
-          service_account: ${{ vars.PROD_DEPLOY_SA }}
 
       - name: Check if the support helm chart needs to be deployed
         id: check-labels
@@ -55,35 +44,27 @@ jobs:
         with:
           fetch-depth: 0  # OR "2" -> To retrieve the preceding commit.
 
-      - name: Auth to gcloud
-        uses: google-github-actions/auth@v3
+      - name: Authenticate to the cluster (keyless WIF)
+        id: auth
+        uses: ./.github/actions/gke-auth
         with:
-          credentials_json: ${{ secrets.GKE_KEY }}
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-
-      - name: Install Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v3
-        with:
-          install_components: 'gke-gcloud-auth-plugin'
+          workload_identity_provider: ${{ vars.PROD_WIF_PROVIDER }}
+          service_account: ${{ vars.PROD_DEPLOY_SA }}
+          cluster_name: ${{ vars.PROD_CLUSTER }}
+          location: ${{ vars.PROD_ZONE }}
+          project_id: ${{ vars.PROD_PROJECT }}
+          token_format: access_token
 
       - name: Install SOPS
         uses: ./.github/actions/install-sops
 
-      - name: Activate credentials for cluster
+      - name: Log in to the GAR helm registry (keyless)
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
-          sops -d -i deployments/jupyter/secrets/gke-key.json
-          gcloud auth \
-            activate-service-account \
-            --key-file deployments/jupyter/secrets/gke-key.json
-          gcloud container clusters \
-            --region=us-central1 --project=cal-icor-hubs \
-            get-credentials spring-2025
-
-      - name: Login to GAR
-        run: |
-          helm registry login \
-            -u _json_key --password-stdin https://us-central1-docker.pkg.dev \
-            < deployments/jupyter/secrets/gke-key.json
+          printf '%s' "$ACCESS_TOKEN" \
+            | helm registry login -u oauth2accesstoken --password-stdin \
+              https://us-central1-docker.pkg.dev
 
       - name: Deploy support helm chart
         run: |
