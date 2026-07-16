@@ -10,8 +10,7 @@ defaults:
   run:
     shell: bash
 
-# The leaf workflows serialize themselves, but only against their own kind. This keeps two
-# runs from interleaving layers against the one shared cluster.
+# Serialize the whole stack; leaf workflows only serialize against themselves.
 concurrency:
   group: dev-stack
   cancel-in-progress: false
@@ -81,12 +80,8 @@ jobs:
       - name: Install the YAML parser
         run: pip install ruamel.yaml==0.19.1
 
-      # This spec is the whole dev-specific part; decide-layers.py just reads it,
-      # so prod reuses the script with its own spec. Fields: output = the
-      # GITHUB_OUTPUT key the layer sets, label = the PR label that turns it on,
-      # shared_branch_only = deploys from shared_branch alone (a prod merge skips
-      # it), when_on/when_off = the strings a value layer emits (a layer without
-      # them emits true/false). environment_output = prod on prod, else staging.
+      # The dev spec decide-layers.py reads; prod passes its own. Field
+      # definitions are in the script's docstring.
       - name: Decide which layers to run
         id: decide
         env:
