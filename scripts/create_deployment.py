@@ -87,10 +87,10 @@ def insert_hub_label(labeler_text: str, hub_name: str) -> str:
     Return labeler_text with a `hub: <hub_name>` label inserted into the
     hub-specific label block in alphabetical order.
 
-    The whole active hub block is rewritten sorted, so it self-heals to
-    alphabetical order on every run. Commented-out entries (e.g. gpu-demo) and
-    any other trailing comment lines are preserved untouched at the bottom of
-    the block. If the hub already has an active entry, the text is unchanged.
+    The whole active hub block is rewritten sorted. Commented-out entries
+    (e.g. gpu-demo) and any other trailing comment lines are preserved
+    untouched at the bottom of the block. If the hub already has an active
+    entry, the text is unchanged.
 
     Args:
         labeler_text (str): The full contents of .github/labeler.yml.
