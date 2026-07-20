@@ -30,6 +30,7 @@ jupyterhub:
       JupyterHub:
         authenticator_class: cilogon
       CILogonOAuthenticator:
+        refresh_pre_spawn: false
         allowed_idps:
           http://google.com/accounts/o8/id:
             default: true

@@ -28,6 +28,7 @@ jupyterhub:
       JupyterHub:
         authenticator_class: cilogon
       CILogonOAuthenticator:
+        refresh_pre_spawn: false
         allowed_idps:
           https://shibboleth.fullerton.edu/idp/shibboleth:
             default: true
