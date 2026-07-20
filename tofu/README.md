@@ -55,11 +55,15 @@ terragrunt apply        # mutates real infra; review the plan first
 
 ## CI
 
-`.github/workflows/tofu-ci.yaml` runs on PRs that touch `tofu/`. Right now it has
-one job: run pre-commit on the changed files.
+There is no dedicated tofu CI workflow. The tofu hooks (`tofu_fmt`,
+`terragrunt_fmt`, `terragrunt_hcl_validate`, `terraform-docs-go`) run locally via
+`pre-commit install`; they sit under `ci.skip` in `.pre-commit-config.yaml`, so
+pre-commit.ci does not run them on PRs. pre-commit.ci runs the remaining hooks.
 
-`plan` and `apply` will be done in a new workflow, and the identity will be
-re-scoped.
+`plan`, `apply`, and `destroy` run through
+`.github/workflows/deploy-spring-2025-cluster.yaml` (`workflow_dispatch` or
+`workflow_call`), which drives `terragrunt run --all` over the
+`clusters/spring-2025` units.
 
 One-time GCP setup (run once, needs an IAM admin):
 

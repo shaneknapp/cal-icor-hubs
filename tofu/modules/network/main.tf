@@ -1,4 +1,3 @@
-# CI smoke test (test-tofu-ci): no-op to trigger a plan; revert before merge.
 # Outbound egress for the cluster's private nodes.
 #
 # This file creates only the outbound path. It does not touch the inbound ingress
