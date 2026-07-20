@@ -63,17 +63,17 @@ inputs = {
   #   net.core.wmem_max=212992           net.ipv4.tcp_rmem=4096 87380 6291456
   #   net.ipv4.tcp_wmem=4096 16384 4194304   net.core.somaxconn=4096
   #
-  # Tuning decisions (reviewed 2026-06-29 against the live core node):
-  #   - Dropped net.core.somaxconn=4096: GKE's node default is already 4096, so
-  #     it was a no-op. Smaller config is better.
-  #   - Lowered rmem_max/wmem_max 64MiB -> 32MiB to match the tcp_rmem/tcp_wmem
-  #     autotuning ceilings; a socket-buffer max above the TCP autotuning max
-  #     buys nothing.
-  #   - Fixed tcp_wmem default 87380 -> 16384 (87380 is the READ default; the
-  #     write default should be the smaller GKE/Linux value of 16384).
-  #   - Added net.ipv4.tcp_tw_reuse=1: lets the node reuse TIME_WAIT sockets for
-  #     new OUTBOUND connections (proxy/nginx -> upstream churn), avoiding
-  #     ephemeral-port exhaustion under load.
+  # Settings (reviewed 2026-06-29 against the live core node):
+  #   - net.core.netdev_max_backlog=30000: deeper NIC ingress queue so bursts to
+  #     the shared node don't get dropped before the kernel drains them.
+  #   - net.core.rmem_max / wmem_max = 32MiB: socket-buffer ceiling matched to the
+  #     tcp_rmem/tcp_wmem autotuning max. Going higher than autotuning uses buys
+  #     nothing.
+  #   - net.ipv4.tcp_rmem / tcp_wmem = "4096 <default> 33554432": the min / default
+  #     / 32MiB-max autotuning windows. Read default 87380, write default 16384.
+  #   - net.ipv4.tcp_tw_reuse=1: the node reuses TIME_WAIT sockets for new outbound
+  #     connections (proxy/nginx -> upstream churn) so it doesn't run out of
+  #     ephemeral ports under load.
   #
   # NOT applied: net.ipv4.tcp_max_syn_backlog and
   # net.ipv4.tcp_slow_start_after_idle are NOT on GKE's node-system-config
