@@ -84,12 +84,23 @@ gcloud iam workload-identity-pools providers create-oidc github \
 gcloud projects add-iam-policy-binding cal-icor-hubs \
   --role="roles/viewer" \
   --member="principalSet://iam.googleapis.com/projects/1045396016572/locations/global/workloadIdentityPools/github/attribute.repository/cal-icor/cal-icor-hubs"
+
+# Deploy identity for tofu; access is fenced to staging by the prod-infra GitHub environment.
+gcloud iam service-accounts add-iam-policy-binding \
+  prod-infra@cal-icor-hubs.iam.gserviceaccount.com \
+  --project=cal-icor-hubs \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/1045396016572/locations/global/workloadIdentityPools/github/attribute.repository/cal-icor/cal-icor-hubs"
 ```
 
 The `attribute-condition` locks the pool to the `cal-icor` org and the
 `principalSet` binding to this one repo, so no other repo can use it. The provider
 resource name in the workflow is
 `projects/1045396016572/locations/global/workloadIdentityPools/github/providers/github`.
+
+`deploy-spring-2025-cluster.yaml` runs tofu by impersonating `prod-infra@` (its
+project roles mirror `dev-infra@`); the `roles/viewer` grant above is a separate
+repo-wide read-only binding, not the deploy identity.
 
 ## Cluster spec
 
