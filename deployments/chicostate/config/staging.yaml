@@ -43,5 +43,4 @@ jupyterhub:
           - ericvd@berkeley.edu
           - sean.smorris@berkeley.edu
           - sean.smorris
-      # CILogonOAuthenticator:
-      #   oauth_callback_url: https://chicostate-staging.jupyter.cal-icor.org/hub/oauth_callback
+          - rdonatello@csuchico.edu
