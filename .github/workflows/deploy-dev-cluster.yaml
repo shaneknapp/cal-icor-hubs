@@ -84,7 +84,7 @@ jobs:
       # cannot grant itself admin.
       - name: Get dev cluster credentials
         if: ${{ inputs.command == 'apply' }}
-        uses: google-github-actions/get-gke-credentials@v2
+        uses: google-github-actions/get-gke-credentials@v3
         with:
           cluster_name: ${{ vars.DEV_CLUSTER }}
           location: ${{ vars.DEV_ZONE }}
