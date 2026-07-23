@@ -497,4 +497,100 @@ jupyterhub:
 
             return (await super().start())
 
+          slow_spawn_message = Unicode(
+              "Server launch is taking longer than expected. Please be patient! Current time spent waiting: {seconds} seconds. Timeout is currently {timeout} seconds.",
+              config=True,
+              help="""
+              The injected timing message to display to the user. The variable `{seconds}`
+              will be replaced by the number of seconds the spawn has currently taken.
+              The variable `{timeout}` will be replaced by the current spawn timeout setting.
+              """,
+          )
+
+
+          async def progress(self):
+            """
+            This function is reporting back the progress of spawning a pod until
+            self._start_future has fired.
+
+            This is working with events parsed by the python kubernetes client,
+            and here is the specification of events that is relevant to understand:
+            ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#event-v1-core
+            """
+
+            if not self.events_enabled:
+                return
+
+            await self._start_watching_events()
+
+            self.log.debug('progress generator: %s', self.pod_name)
+            start_future = self._start_future
+            progress = 0
+            next_event = 0
+
+            # timers for deciding when to show slow spawn patience message
+            start_time = time.perf_counter()
+            last_message_time = 0
+
+            break_while_loop = False
+            while True:
+                # This logic avoids a race condition. self._start() will be invoked by
+                # self.start() and almost directly set self._start_future. But,
+                # progress() will be invoked via self.start(), so what happen first?
+                # Due to this, the logic below is to avoid making an assumption that
+                # self._start_future was set before this function was called.
+                if start_future is None and self._start_future:
+                    start_future = self._start_future
+
+                # Ensure we capture all events by inspecting events a final time
+                # after the start_future signal has fired, we could have been in
+                # .sleep() and missed something.
+                if start_future and start_future.done():
+                    break_while_loop = True
+
+                # if the timer is greater than self.server_spawn_launch_timer_threshold
+                # display a message to the user with an incrementing count in seconds
+                elapsed = time.perf_counter() - start_time
+                if (
+                    elapsed >= self.slow_spawn_message_threshold
+                    and self.slow_spawn_message_threshold > 0
+                ):
+                    # don't spam the user, so only update the timer message every few seconds
+                    if elapsed >= last_message_time + self.slow_spawn_message_frequency:
+                        patience_message = textwrap.dedent(self.slow_spawn_message)
+                        patience_message = patience_message.format(seconds=int(elapsed), timeout=self.start_timeout)
+                        last_message_time = elapsed
+                        yield {
+                            'message': patience_message,
+                        }
+
+                events = self.events
+                len_events = len(events)
+                if next_event < len_events:
+                    for i in range(next_event, len_events):
+                        event = events[i]
+                        # move the progress bar.
+                        # Since we don't know how many events we will get,
+                        # asymptotically approach 90% completion with each event.
+                        # each event gets 33% closer to 90%:
+                        # 30 50 63 72 78 82 84 86 87 88 88 89
+                        progress += (90 - progress) / 3
+
+                        yield {
+                            'progress': int(progress),
+                            'raw_event': event,
+                            'message': "%s [%s] %s"
+                            % (
+                                event["lastTimestamp"] or event["eventTime"],
+                                event["type"],
+                                event["message"],
+                            ),
+                        }
+                    next_event = len_events
+
+                if break_while_loop:
+                    break
+                await asyncio.sleep(1)
+
+
         c.JupyterHub.spawner_class = CustomAttrSpawner
