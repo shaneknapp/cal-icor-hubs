@@ -1,6 +1,8 @@
 name: "Lint files on pull requests"
 on:
   - pull_request  # yamllint disable-line rule:truthy
+permissions:
+  contents: read
 
 jobs:
   lint:
