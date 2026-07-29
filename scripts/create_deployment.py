@@ -787,6 +787,11 @@ def main(args):
         + "\nDo not forget to create the alerts for the new hub after merging "
         + "the PR to prod. The instructions for that are found here: \n"
         + "https://docs.cal-icor.org/new-hub/#create-the-alerts-for-the-new-hub"
+        + "\n\n"
+        + "You also need to update the openssl token in the "
+        + "cloudbank-pilot-hub-users service in the enc-pilots.json file for "
+        + "the new hub. The instructions for that are found here: \n"
+        + "https://github.com/cal-icor/cal-icor-hubs#keeping-it-in-sync-with-cloudbank-pilot-hub-users"
     )
 
 
