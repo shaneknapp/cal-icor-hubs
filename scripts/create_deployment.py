@@ -789,7 +789,7 @@ def main(args):
         + "https://docs.cal-icor.org/new-hub/#create-the-alerts-for-the-new-hub"
         + "\n\n"
         + "You also need to update the openssl token in the "
-        + "cloudbank-pilot-hub-users service in the prod.plain.yaml file for "
+        + "cloudbank-pilot-hub-users service in the enc-pilots.json file for "
         + "the new hub. The instructions for that are found here: \n"
         + "https://github.com/cal-icor/cal-icor-hubs#keeping-it-in-sync-with-cloudbank-pilot-hub-users"
     )
