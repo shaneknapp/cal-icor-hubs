@@ -180,6 +180,8 @@ tofu-user-pool:
   - 'deployments/csun/**'
 'hub: csus':
   - 'deployments/csus/**'
+'hub: csusb':
+  - 'deployments/csusb/**'
 'hub: csusj':
   - 'deployments/csusj/**'
 'hub: csusonoma':
