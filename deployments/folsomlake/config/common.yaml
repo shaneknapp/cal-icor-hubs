@@ -18,8 +18,8 @@ jupyterhub:
       hub.jupyter.org/pool-name: core-pool-2026-06-30
   singleuser:
     image:
-      name: us-central1-docker.pkg.dev/cal-icor-hubs/user-images/base-user-image
-      tag: bde8b3293fd2
+      name: us-central1-docker.pkg.dev/cal-icor-hubs/user-images/jupytutor-user-image
+      tag: b55c6922dc52
     extraFiles:
       # DH-216
       remove-exporters:
