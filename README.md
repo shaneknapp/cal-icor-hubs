@@ -278,8 +278,9 @@ openssl rand -hex 32
 
 The dashboard authenticates using these same tokens, so whenever a hub's token
 is created here, the **same value** must also be updated in the
-`cloudbank-pilot-hub-users` repo's `enc-pilots.json`, in the `token` field of
-the pilot entry matching this hub (matched by `url`, where `where: icor`).
+[`cloudbank-pilot-hub-users`](https://github.com/sean-morris/cloudbank-pilot-hub-users)
+repo's `enc-pilots.json`, in the `token` field of the pilot entry matching this
+hub (matched by `url`, where `where: icor`).
 
 You can get the generated token to put in `enc-pilots.json` by running:
 
