@@ -19,6 +19,7 @@ jupyterhub-home-nfs:
       QuotaManager:
         paths: [
           "/export/chicostate/staging", "/export/chicostate/prod",
+          "/export/cpp/staging", "/export/cpp/prod",
           "/export/csub/staging", "/export/csub/prod",
           "/export/csueb/staging", "/export/csueb/prod",
           "/export/csuf/staging", "/export/csuf/prod",
