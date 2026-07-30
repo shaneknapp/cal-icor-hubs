@@ -158,7 +158,7 @@ after you last synced with this repo but before you upstreamed your changes.
 
 ### Authenticating to the cloud infrastructure
 
-Please see the [Authenticating with `gcloud`, `kubectl` and `gh`](https://docs.cal-icor.org/new-hub/#authenticating-with-gcloud-kubectl-and-gh)
+Please see the [Authenticating with `gcloud`, `kubectl` and `gh`](https://docs.cal-icor.org/admin-auth)
 found in our [admin docs](https://docs.cal-icor.org/index-2/)
 
 ### Syncing your repo
