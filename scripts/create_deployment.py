@@ -303,11 +303,11 @@ def stage_and_push(
     if extra_files:
         files_to_add.extend(extra_files)
     for file in files_to_add:
-        print(f"Adding {str(file)} to staging.")
+        print(f"Adding {file!s} to staging.")
         try:
             subprocess.check_call(["git", "add", str(file)], cwd=str(root_path))
         except subprocess.CalledProcessError as e:
-            print(f"Error adding {str(file)} to commit: {e}")
+            print(f"Error adding {file!s} to commit: {e}")
             exit(1)
 
     commit_message = f"Add {hub_name} deployment."
@@ -424,20 +424,10 @@ def populate_deployment_config(
         output_dir=f"{root_path}/deployments",
         no_input=manual_config,
         extra_context={
-            "image_name": (
-                config["image_name"]
-                if "image_name" in config and config["image_name"]
-                else None
-            ),
-            "image_tag": (
-                config["image_tag"]
-                if "image_tag" in config and config["image_tag"]
-                else None
-            ),
+            "image_name": (config["image_name"] if config.get("image_name") else None),
+            "image_tag": (config["image_tag"] if config.get("image_tag") else None),
             "hub_type": (
-                config["hub_type"]
-                if "hub_type" in config and config["hub_type"]
-                else "python-base"
+                config["hub_type"] if config.get("hub_type") else "python-base"
             ),
             "hub_name": config["hub_name"],
             "hub_nfs_mount_path": config["hub_nfs_mount_path"],
