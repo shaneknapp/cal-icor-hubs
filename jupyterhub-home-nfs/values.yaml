@@ -34,6 +34,7 @@ jupyterhub-home-nfs:
           "/export/csusb/staging", "/export/csusb/prod",
           "/export/csusj/staging", "/export/csusj/prod",
           "/export/csusonoma/staging", "/export/csusonoma/prod",
+          "/export/csustan/staging", "/export/csustan/prod",
           "/export/demo/staging", "/export/demo/prod",
           "/export/dvc/staging", "/export/dvc/prod",
           "/export/folsomlake/staging", "/export/folsomlake/prod",
