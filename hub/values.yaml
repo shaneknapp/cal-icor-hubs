@@ -302,7 +302,7 @@ jupyterhub:
 
 
     # The default of 64 is way too low for us
-    concurrentSpawnLimit: 200
+    concurrentSpawnLimit: 100
     loadRoles:
       # Should use this, not hub.config.JupyterHub.load_roles - that will
       # override any existing load_roles set by z2jh
@@ -451,6 +451,20 @@ jupyterhub:
               self.user.admin = override['admin']
 
           async def start(self):
+            # testing custom vars
+            if self.user.admin:
+              self.log.info(f'User {self.user.name} is an admin')
+              self.log.info(f'set more if admin is in jh group test-group')
+              group = z2jh.get_config("custom.configGroup", {})
+              self.log.info(f'configGroup: {group["another-group"]}')
+              self.log.info(f'{z2jh.get_config("custom.configGroup", {})}')
+            for group in self.user.groups:
+              self.log.info(f'User {self.user.name} is in group {group.name}')
+              self.log.info(f'self.user.groups": {self.user.groups}')
+
+            for g in self.user.groups:
+              self.log.info(f'self.user.groups.{g}: {g}')
+
             # give admins read/write access to the shared folder
             if self.user.admin:
               for name, v in list(self.volume_mounts.items()):
