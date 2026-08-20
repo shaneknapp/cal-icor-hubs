@@ -468,7 +468,7 @@ jupyterhub:
                 self.log.info(f'self.user.groups.{g}.{x}: {g.__dict__[x]}')
 
 
-            # NEXT UP SET ENV VARS
+            # test above code and then NEXT UP SET ENV VARS
 
             # give admins read/write access to the shared folder
             if self.user.admin:
