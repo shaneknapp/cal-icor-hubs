@@ -13,13 +13,19 @@ jupyterhub:
           name: Cal-ICOR Workshop Hub
           logo_url: https://www.cal-icor.org/images/logos/cal-icor.png
           url: https://cal-icor.org
-    configGroup:
-      config-in-common:
+    groups:
+      - name: config-in-common
         enabled: true
         config: "configured!"
-      another-group:
+      - name: another-group
         enabled: false
         config: "another group configured!"
+      # config-in-common:
+      #   enabled: true
+      #   config: "configured!"
+      # another-group:
+      #   enabled: false
+      #   config: "another group configured!"
   scheduling:
     userScheduler:
       nodeSelector:
