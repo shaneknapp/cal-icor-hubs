@@ -451,24 +451,22 @@ jupyterhub:
               self.user.admin = override['admin']
 
           async def start(self):
-            # testing custom vars
-            if self.user.admin:
-              self.log.info(f'User {self.user.name} is an admin')
-              self.log.info(f'set more if admin is in jh group test-group')
-              group = z2jh.get_config("custom.configGroup", {})
-              self.log.info(f'configGroup: {group["another-group"]}')
-              self.log.info(f'{z2jh.get_config("custom.configGroup", {})}')
-            for group in self.user.groups:
-              self.log.info(f'User {self.user.name} is in group {group.name}')
-              self.log.info(f'self.user.groups": {self.user.groups}')
 
+            # use secret key for users in group 'jh-group' to set an environment variable
+            #
+            # a user must be in the jupyterhub-defined group 'jh-group'
+            # the secret key/value is defined in <deployment>/secrets/prod|staging.yaml
+            #
+            # this works for regular environment vars, but not rstudio
+            groups = z2jh.get_config("custom.groups", {})
+            testgroup = groups.get("config-in-common", {})
+
+            # the user may be in more than one group, so check 'em all
             for g in self.user.groups:
-              self.log.info(f'self.user.groups.{g}: {g}')
-              for x in g.__dict__:
-                self.log.info(f'self.user.groups.{g}.{x}: {g.__dict__[x]}')
-
-
-            # test above code and then NEXT UP SET ENV VARS
+              # self.log.info(f'self.user.groups.{x}: {x}')
+              if g.name == 'jh-group':
+                self.log.info('adding keys to self.environment')
+                self.environment.update({testgroup.get("key"): testgroup.get("value")})
 
             # give admins read/write access to the shared folder
             if self.user.admin:

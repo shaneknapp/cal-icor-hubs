@@ -14,18 +14,12 @@ jupyterhub:
           logo_url: https://www.cal-icor.org/images/logos/cal-icor.png
           url: https://cal-icor.org
     groups:
-      - name: config-in-common
+      group-one:
         enabled: true
         config: "configured!"
-      - name: another-group
+      another-group:
         enabled: false
         config: "another group configured!"
-      # config-in-common:
-      #   enabled: true
-      #   config: "configured!"
-      # another-group:
-      #   enabled: false
-      #   config: "another group configured!"
   scheduling:
     userScheduler:
       nodeSelector:
