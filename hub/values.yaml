@@ -454,7 +454,9 @@ jupyterhub:
 
             # use secret key for users in group 'jh-group' to set an environment variable
             #
-            # a user must be in the jupyterhub-defined group 'jh-group'
+            # a user must be in the jupyterhub-defined group 'jh-group' AND the
+            # helm-defined group 'helm-defined-group' to get the key/value set
+            # in their environment.
             # the secret key/value is defined in <deployment>/secrets/prod|staging.yaml
             #
             # groups can be named differently across deployments, so best-practice would
@@ -469,7 +471,7 @@ jupyterhub:
             # need to put the env var in .Renviron if necessary, as well as explicitly
             # delete it if the user is not in the group.
             groups = z2jh.get_config("custom.groups", {})
-            testgroup = groups.get("config-in-common", {})
+            testgroup = groups.get("helm-defined-group", {})
 
             # the user may be in more than one group, so check 'em all
             for g in self.user.groups:
