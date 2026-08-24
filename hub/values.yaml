@@ -457,7 +457,9 @@ jupyterhub:
             # a user must be in the jupyterhub-defined group 'jh-group'
             # the secret key/value is defined in <deployment>/secrets/prod|staging.yaml
             #
-            # this works for regular environment vars, but not rstudio
+            # this works for regular environment vars, but not rstudio.  for that we will
+            # need to put the env var in .Renviron if necessary, as well as explicitly
+            # delete it if the user is not in the group.
             groups = z2jh.get_config("custom.groups", {})
             testgroup = groups.get("config-in-common", {})
 
