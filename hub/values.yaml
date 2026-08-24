@@ -302,7 +302,7 @@ jupyterhub:
 
 
     # The default of 64 is way too low for us
-    concurrentSpawnLimit: 100
+    concurrentSpawnLimit: 200
     loadRoles:
       # Should use this, not hub.config.JupyterHub.load_roles - that will
       # override any existing load_roles set by z2jh
@@ -456,6 +456,14 @@ jupyterhub:
             #
             # a user must be in the jupyterhub-defined group 'jh-group'
             # the secret key/value is defined in <deployment>/secrets/prod|staging.yaml
+            #
+            # groups can be named differently across deployments, so best-practice would
+            # be to have the helm config group name include the institution and/or class
+            # name, so that we can have multiple groups across all deployments w/o and
+            # name collisions.  For example, 'cal-icor-workshop-2026' or 'ucsb-cs188-fa26'.
+            #
+            # the reason we need to do this is that the primary checks for groups happen
+            # in the spawner, which is shared across all hubs.
             #
             # this works for regular environment vars, but not rstudio.  for that we will
             # need to put the env var in .Renviron if necessary, as well as explicitly

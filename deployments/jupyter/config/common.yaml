@@ -14,7 +14,7 @@ jupyterhub:
           logo_url: https://www.cal-icor.org/images/logos/cal-icor.png
           url: https://cal-icor.org
     groups:
-      config-in-common:
+      jh-group:
         enabled: true
         config: "configured!"
       another-group:
