@@ -474,7 +474,7 @@ def write_report(report, fmt, script_dir):
         end_slug = report["end"].replace(" ", "T").replace(":", "")
         filename = f"concurrent-users-{start_slug}-to-{end_slug}.{ext}"
     else:
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        date_str = datetime.now().astimezone().strftime("%Y-%m-%d")
         filename = f"concurrent-users-{date_str}.{ext}"
     path = script_dir / "reports" / filename
 
