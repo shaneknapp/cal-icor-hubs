@@ -218,6 +218,7 @@ jupyterhub:
             </div>
 
   hub:
+    shutdownOnLogout: true
     initContainers:
       - name: templates-clone
         image: alpine/git:2.40.1
