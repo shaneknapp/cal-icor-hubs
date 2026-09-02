@@ -101,6 +101,14 @@ jupyterhub:
           # https://github.com/NASA-IMPACT/veda-jupyterhub/issues/96
           FileContentsManager:
             always_delete_dir: true
+          MappingKernelManager:
+            cull_idle_timeout: 3600
+            cull_interval: 300
+            cull_connected: true
+          ServerApp:
+            # Allow JupyterLab to show the 'View -> Show Hidden Files' option
+            # in the menu. Defaults are not changed.
+            shutdown_no_activity_timeout: 3600
           # don't store RTC state on NFS...  sqlite/databases + nfs == sadness
           # we don't yet have RTC enabled, but after seeing this config in the
           # 2i2c config, it seems like a good idea to set this now
@@ -112,9 +120,9 @@ jupyterhub:
         data:
           # commenting this out as it's mildly redundant, and will re-set the cull timeout
           # for the singleuser server back to 60m.
-          # NotebookApp:
-          #   # shutdown the server after no 30 mins of no activity
-          #   shutdown_no_activity_timeout: 1800
+          NotebookApp:
+            # shutdown the server after 60 mins of no activity
+            shutdown_no_activity_timeout: 3600
           # if a user leaves a notebook with a running kernel,
           # the effective idle timeout will typically be CULL_TIMEOUT + CULL_KERNEL_TIMEOUT
           # as culling the kernel will register activity,
