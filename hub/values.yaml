@@ -105,6 +105,7 @@ jupyterhub:
             cull_idle_timeout: 3600
             cull_interval: 300
             cull_connected: true
+            cull_busy: true
           ServerApp: &server_app_config
             shutdown_no_activity_timeout: 3600
           # don't store RTC state on NFS...  sqlite/databases + nfs == sadness
