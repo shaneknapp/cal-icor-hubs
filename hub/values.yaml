@@ -8,9 +8,9 @@ nfsPVC:
 
 jupyterhub:
   cull:
-    # Cull after 60min of inactivity (this is actually the default, but we set it here to be explicit)
+    # cull after 60min of inactivity (this is actually the default, but we set it here to be explicit)
     timeout: 3600 # see https://github.com/cal-icor/cal-icor-hubs/issues/1064
-    every: 600
+    every: 300
     # No pods over 12h long
     maxAge: 43200
   prePuller:
@@ -103,10 +103,12 @@ jupyterhub:
           FileContentsManager:
             always_delete_dir: true
           MappingKernelManager: &mapping_kernel_manager_server_config
+            # cull idle kernels after 1h of inactivity, check every 5min, and cull even if connected
             cull_idle_timeout: 3600
             cull_interval: 300
             cull_connected: true
           ServerApp: &server_app_config
+            # cull idle servers after 1h of inactivity, check every 5min
             shutdown_no_activity_timeout: 3600
           # don't store RTC state on NFS...  sqlite/databases + nfs == sadness
           # we don't yet have RTC enabled, but after seeing this config in the
@@ -117,8 +119,7 @@ jupyterhub:
       jupyter_notebook_config.json:
         mountPath: /etc/jupyter/jupyter_notebook_config.json
         data:
-          # commenting this out as it's mildly redundant, and will re-set the cull timeout
-          # for the singleuser server back to 60m.
+          # use the same config as jupyter_server_config.json for the notebook server
           NotebookApp: *server_app_config
           MappingKernelManager: *mapping_kernel_manager_server_config
           NotebookNotary:
