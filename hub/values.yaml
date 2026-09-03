@@ -10,6 +10,7 @@ jupyterhub:
   cull:
     # Cull after 60min of inactivity (this is actually the default, but we set it here to be explicit)
     timeout: 3600 # see https://github.com/cal-icor/cal-icor-hubs/issues/1064
+    every: 600
     # No pods over 12h long
     maxAge: 43200
   prePuller:
@@ -105,7 +106,7 @@ jupyterhub:
             cull_idle_timeout: 3600
             cull_interval: 300
             cull_connected: true
-            # cull_busy: true
+            cull_busy: true
           ServerApp: &server_app_config
             shutdown_no_activity_timeout: 3600
           # don't store RTC state on NFS...  sqlite/databases + nfs == sadness
