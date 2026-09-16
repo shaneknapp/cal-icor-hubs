@@ -39,11 +39,11 @@ inputs = {
   pool_name            = "user-pool-2026-07-07"
   enable_private_nodes = true
 
-  node_locations = ["us-central1-b"]
+  node_locations = ["us-central1-b", "us-central1-c"]
 
   machine_type    = "n2-highmem-8"
   min_nodes       = 0
-  max_nodes       = 5
+  max_nodes       = 8
   location_policy = "ANY"
   disk_size_gb    = 200
 
