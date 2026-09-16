@@ -11,8 +11,8 @@ jupyterhub:
     # cull after 60min of inactivity (this is actually the default, but we set it here to be explicit)
     timeout: 3600 # see https://github.com/cal-icor/cal-icor-hubs/issues/1064
     every: 300
-    # No pods over 12h long
-    maxAge: 43200
+    # No pods over 8h long
+    maxAge: 28800
   prePuller:
     hook:
       pullOnlyOnChanges: true
@@ -49,7 +49,7 @@ jupyterhub:
             - name: net.ipv4.ip_local_port_range
               value: "10000 65000"
       image:
-        tag: 5.1.0
+        tag: 5.3.0
       networkPolicy:
         # Egress to the dashboard on 9000. A broad ipBlock rule covers this
         # today; naming the port keeps a later tightening from breaking it.
