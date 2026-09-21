@@ -46,7 +46,7 @@ inputs = {
 
   machine_type      = "n2-highmem-8"
   min_nodes         = 0
-  max_nodes         = 8
+  max_nodes         = 10
   total_node_limits = true # max_nodes caps the whole pool
   location_policy   = "ANY"
   disk_size_gb      = 200
