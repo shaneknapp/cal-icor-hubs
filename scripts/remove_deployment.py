@@ -5,6 +5,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from ruamel.yaml import YAML
@@ -15,6 +16,12 @@ EXPECTED_PROJECT = "cal-icor-hubs"
 
 NFS_NAMESPACE = "jupyterhub-home-nfs"
 UPSTREAM_REPO = "cal-icor/cal-icor-hubs"
+# the quota enforcer's live config, inside the enforce-xfs-quota container
+NFS_QUOTA_CONFIG = "/etc/jupyterhub-home-nfs/mounted-secret/chart-config.yaml"
+
+POLL_INTERVAL = 15
+CHECKS_START_TIMEOUT = 120
+NFS_ROLLOUT_TIMEOUT = 1800
 
 ISSUE_TEMPLATES = (
     "additional_storage_request.yaml",
@@ -77,7 +84,7 @@ def check_environment(root_path: Path, hub_name: str, finish: bool):
     Args:
         root_path (Path): The path to the root directory of the repository.
         hub_name (str): The name of the hub to remove.
-        finish (bool): If True, only the git checks apply.
+        finish (bool): If True, skip the gcloud project check.
 
     Raises:
         SystemExit: If any check fails.
@@ -100,16 +107,14 @@ def check_environment(root_path: Path, hub_name: str, finish: bool):
     if hub_name == "template":
         errors.append("refusing to remove the cookiecutter template")
 
-    if not finish:
-        try:
-            context = read_output(["kubectl", "config", "current-context"])
-        except subprocess.CalledProcessError:
-            context = ""
-        if context != EXPECTED_CONTEXT:
-            errors.append(
-                f"kubectl context is '{context}', expected '{EXPECTED_CONTEXT}'"
-            )
+    try:
+        context = read_output(["kubectl", "config", "current-context"])
+    except subprocess.CalledProcessError:
+        context = ""
+    if context != EXPECTED_CONTEXT:
+        errors.append(f"kubectl context is '{context}', expected '{EXPECTED_CONTEXT}'")
 
+    if not finish:
         try:
             project = read_output(["gcloud", "config", "get-value", "project"])
         except subprocess.CalledProcessError:
@@ -408,6 +413,75 @@ def nfs_exec(pod_name: str, shell_command: str, dry_run: bool = False):
     )
 
 
+def wait_for_nfs_config(mount_path: str, dry_run: bool = False):
+    """
+    Wait until the running quota enforcer no longer lists /export/<mount_path>.
+    The enforcer re-creates every configured path on each loop, so deleting
+    the dirs before the quota path PR deploys just brings them back empty.
+    """
+    if dry_run:
+        print(
+            f"Dry run enabled. Would wait for the NFS pod to drop /export/{mount_path}"
+            + " from its quota paths."
+        )
+        return
+
+    print(f"Waiting for the NFS pod to drop /export/{mount_path} from its quota paths.")
+    deadline = time.monotonic() + NFS_ROLLOUT_TIMEOUT
+    while True:
+        try:
+            pods = read_output(
+                [
+                    "kubectl",
+                    "get",
+                    "pod",
+                    "-n",
+                    NFS_NAMESPACE,
+                    "-l",
+                    "app.kubernetes.io/component=nfs-server",
+                    "-o",
+                    "jsonpath={.items[*].metadata.name}",
+                ]
+            ).split()
+        except subprocess.CalledProcessError:
+            pods = []
+
+        # more than one pod means a rollout is still in progress
+        if len(pods) == 1:
+            result = subprocess.run(
+                [
+                    "kubectl",
+                    "exec",
+                    "-n",
+                    NFS_NAMESPACE,
+                    pods[0],
+                    "-c",
+                    "enforce-xfs-quota",
+                    "--",
+                    "sh",
+                    "-c",
+                    f"grep -qF /export/{mount_path}/ {NFS_QUOTA_CONFIG}; echo $?",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            # grep exits 1 on no match
+            if result.stdout.strip() == "1":
+                print(f"{pods[0]} no longer lists /export/{mount_path}.")
+                return
+
+        if time.monotonic() > deadline:
+            print(
+                f"Error: the NFS pod still lists /export/{mount_path} after "
+                + f"{NFS_ROLLOUT_TIMEOUT // 60} minutes. Check that the quota path "
+                + "PR got the jupyterhub-home-nfs-deployment label and that its "
+                + "deploy succeeded, then rerun with --finish."
+            )
+            sys.exit(1)
+        time.sleep(POLL_INTERVAL)
+
+
 def remove_nfs_dirs(mount_path: str, skip_archive: bool, dry_run: bool = False):
     """
     Archive /export/<mount_path> to /export/<mount_path>.tar.gz, check that
@@ -594,12 +668,67 @@ def create_pr(
     return result.stdout.strip().splitlines()[-1]
 
 
+def wait_for_checks(pr_url: str) -> bool:
+    """
+    Wait for the PR's checks to finish. The labeler is one of them, and the
+    deploy reads the labels it adds, so merging early can skip a deploy.
+    Returns True if every check passed.
+    """
+    print(f"\nWaiting for checks on {pr_url}.")
+    deadline = time.monotonic() + CHECKS_START_TIMEOUT
+    while True:
+        result = subprocess.run(
+            ["gh", "pr", "checks", pr_url],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        output = result.stdout + result.stderr
+        # gh exits 0 when all checks pass, 8 while any are pending
+        if result.returncode == 0:
+            return True
+        if result.returncode == 8:
+            subprocess.run(
+                ["gh", "pr", "checks", pr_url, "--watch", "--interval", "10"],
+                check=False,
+            )
+            # some checks (eg: pre-commit.ci) register late, so look again
+            deadline = time.monotonic() + CHECKS_START_TIMEOUT
+        elif "no checks reported" not in output:
+            print(output)
+            return False
+        if time.monotonic() > deadline:
+            print(f"No checks started on {pr_url} after {CHECKS_START_TIMEOUT}s.")
+            return False
+        time.sleep(POLL_INTERVAL)
+
+
 def merge_pr(pr_url: str, resume_hint: str) -> bool:
     """
-    Show the PR URL and ask whether to merge it. 'y' merges, anything else
-    exits with resume_hint.
+    Wait for the PR's checks, show its labels, then ask whether to merge it.
+    'y' merges, anything else exits with resume_hint.
     """
+    checks_passed = wait_for_checks(pr_url)
+    try:
+        labels = read_output(
+            [
+                "gh",
+                "pr",
+                "view",
+                pr_url,
+                "--json",
+                "labels",
+                "--jq",
+                '[.labels[].name] | join(", ")',
+            ]
+        )
+    except subprocess.CalledProcessError:
+        labels = "(unable to read labels)"
+
     print(f"\nPull request: {pr_url}")
+    print(f"Labels: {labels or '(none)'}")
+    if not checks_passed:
+        print("Warning: not every check passed. Look at the PR before merging.")
     if not confirm("Does it look good and is it ready to merge? [y/n]"):
         print(f"Not merging. {resume_hint}")
         sys.exit(0)
@@ -638,10 +767,11 @@ def remove_infrastructure(
     no_pr: bool = False,
 ):
     """
-    Steps 1-4 of https://docs.cal-icor.org/remove-hub/: alerts, CILogon
-    client, helm releases, NFS dirs, then the labeler/issue template/quota
-    path PR. This PR has to merge before the deployment folder goes, or the
-    labeler re-creates the hub's label on the next PR.
+    Steps 1-3 of https://docs.cal-icor.org/remove-hub/: alerts, CILogon
+    client and helm releases, then the labeler/issue template/quota path PR.
+    This PR has to merge before the deployment folder goes, or the labeler
+    re-creates the hub's label on the next PR. It also has to deploy before
+    the NFS dirs go (see wait_for_nfs_config).
     """
     mount_path = get_nfs_mount_path(root_path, hub_name)
     if mount_path is None:
@@ -658,10 +788,6 @@ def remove_infrastructure(
 
     print(f"Uninstalling helm releases for {hub_name}.")
     uninstall_helm_releases(hub_name, dry_run)
-
-    if mount_path:
-        check_leftover_pods(hub_name, dry_run)
-        remove_nfs_dirs(mount_path, skip_archive, dry_run)
 
     branch_name = f"remove-{hub_name}-gha"
     print(f"Creating feature branch {branch_name}.")
@@ -716,12 +842,15 @@ def remove_deployment_dir(
     root_path: Path,
     github_user: str,
     hub_name: str,
+    skip_archive: bool = False,
     dry_run: bool = False,
     no_pr: bool = False,
 ):
     """
-    Step 5 of https://docs.cal-icor.org/remove-hub/: remove deployments/<hub>
-    in a second PR, once the labeler entry is gone from staging.
+    Steps 4-5 of https://docs.cal-icor.org/remove-hub/: archive and delete
+    the NFS dirs once the quota path change has deployed, then remove
+    deployments/<hub> in a second PR, once the labeler entry is gone from
+    staging.
     """
     labeler = (root_path / ".github" / "labeler.yml").read_text()
     if not dry_run and remove_hub_label(labeler, hub_name) != labeler:
@@ -730,6 +859,12 @@ def remove_deployment_dir(
             + "Merge the first PR and sync staging before running --finish."
         )
         sys.exit(1)
+
+    mount_path = get_nfs_mount_path(root_path, hub_name)
+    if mount_path:
+        check_leftover_pods(hub_name, dry_run)
+        wait_for_nfs_config(mount_path, dry_run)
+        remove_nfs_dirs(mount_path, skip_archive, dry_run)
 
     branch_name = f"remove-{hub_name}-deployment"
     print(f"Creating feature branch {branch_name}.")
@@ -782,19 +917,23 @@ def main(args):
             "Performing a dry-run: no remote, NFS, helm or git changes will be made.\n"
         )
 
-    if not args.finish:
-        if args.dry_run:
-            print(f"Dry run enabled. Would ask you to type '{hub_name}' to continue.")
-        elif not confirm(
+    nfs_action = "deletes" if args.skip_archive else "archives then deletes"
+    if args.finish:
+        warning = (
+            f"This {nfs_action} the NFS homedirs and removes deployments/{hub_name}."
+        )
+    else:
+        warning = (
             f"This uninstalls {hub_name}-prod and {hub_name}-staging, deletes "
-            + "their alerts and CILogon client, and "
-            + ("deletes" if args.skip_archive else "archives then deletes")
-            + f" the NFS homedirs. Type '{hub_name}' to continue:",
-            expected=hub_name,
-        ):
-            print("Exiting.")
-            sys.exit(1)
+            + f"their alerts and CILogon client, and {nfs_action} the NFS homedirs."
+        )
+    if args.dry_run:
+        print(f"Dry run enabled. Would ask you to type '{hub_name}' to continue.")
+    elif not confirm(f"{warning} Type '{hub_name}' to continue:", expected=hub_name):
+        print("Exiting.")
+        sys.exit(1)
 
+    if not args.finish:
         remove_infrastructure(
             root_path,
             args.github_user,
@@ -805,7 +944,12 @@ def main(args):
         )
 
     remove_deployment_dir(
-        root_path, args.github_user, hub_name, args.dry_run, args.no_pr
+        root_path,
+        args.github_user,
+        hub_name,
+        args.skip_archive,
+        args.dry_run,
+        args.no_pr,
     )
 
     done = "branches pushed" if args.no_pr else "removed from staging"
@@ -826,9 +970,10 @@ if __name__ == "__main__":
         + "cal-icor-hubs directory, on the staging branch."
         + "\n\n"
         + "Follows https://docs.cal-icor.org/remove-hub/: deletes the alerts and "
-        + "CILogon client, uninstalls the helm releases, archives and deletes "
-        + "the NFS homedirs, then opens two PRs (labels/issue templates/quota "
-        + "paths first, then the deployment folder), asking before merging each.",
+        + "CILogon client, uninstalls the helm releases, opens a PR for the "
+        + "labels/issue templates/quota paths, archives and deletes the NFS "
+        + "homedirs once that PR deploys, then opens a PR for the deployment "
+        + "folder. It waits for each PR's checks, then asks before merging.",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
@@ -854,8 +999,9 @@ if __name__ == "__main__":
         "--finish",
         "-f",
         action="store_true",
-        help="If set, only remove the deployment folder (second PR). Use this "
-        + "after merging the first PR by hand.",
+        help="If set, only archive and delete the NFS dirs and remove the "
+        + "deployment folder (second PR). Use this after merging the first PR "
+        + "by hand.",
     )
     parser.add_argument(
         "--no-pr",
