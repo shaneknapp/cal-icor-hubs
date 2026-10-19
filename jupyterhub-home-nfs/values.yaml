@@ -10,10 +10,10 @@ jupyterhub-home-nfs:
     enabled: true
     resources:
       requests:
-        cpu: 0.001
+        cpu: 0.05
         memory: 256M
       limits:
-        cpu: 0.2
+        cpu: 1
         memory: 1G
     config:
       QuotaManager:
@@ -58,10 +58,10 @@ jupyterhub-home-nfs:
   nfsServer:
     resources:
       requests:
-        cpu: 0.02
-        memory: 512M
+        cpu: 0.05
+        memory: 768M
       limits:
-        cpu: 0.1
+        cpu: 0.5
         memory: 1.5G
     enableClientAllowlist: true
     # note: these are private IP ranges that should cover all of our GKE nodes,
