@@ -68,8 +68,11 @@ jupyterhub-home-nfs:
     # but will need to be updated if we create a new cluster or node pools with
     # different IP ranges.
     allowedClients:
-      - "10.7.196.*"   # node primary IPs (autoscaled nodes may land in this subnet)
-      - "10.7.199.*"   # node primary IPs (all pools share this subnet)
+      # node primary IPs: subnet gke-spring-2025-subnet-2899df57, 10.7.196.0/22
+      - "10.7.196.*"
+      - "10.7.197.*"
+      - "10.7.198.*"
+      - "10.7.199.*"
       - "10.92.*.1"    # pod CIDR kubelet addresses (10.92.0.0/14 covers 10.92-10.95)
       - "10.93.*.1"    # pod CIDR kubelet addresses (cont.)
       - "10.94.*.1"    # pod CIDR kubelet addresses (cont.)
