@@ -367,6 +367,12 @@ jupyterhub:
       Authenticator:
         enable_auth_state: true
         # manage_groups: true
+      CILogonOAuthenticator:
+        # CILogon rejects unregistered scopes; most clients lack "profile"
+        scope:
+          - openid
+          - email
+          - org.cilogon.userinfo
       # OAuthenticator:
       #   allow_all: true
       KubeSpawner:
